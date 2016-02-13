@@ -167,10 +167,12 @@ class PCFG(PCFGBase):
             new_rules_2b.append(new_rule)
 
         # 2.c) Adapt rules where A appears on the right-hand side.
+        # TODO: do not consolidate eventually, but rather add up probabilities as described in class -- the two are not equivalent
         new_rules_2c = [PCFG.__remove_from_rhs(rule, A, epsilon_rule.probability, seen_epsilon_vars)
                         for rule in new_rules_2b]
 
-        # Finally, consolidate any rules X -> u [q_1], ..., X -> u [q_n] into one rule X -> u [q_1 + ... + q_n]
+        # Finally, consolidate every set of rules {X -> u [q_1], ..., X -> u [q_n]}
+        # into one rule X -> u [q_1 + ... + q_n]
         repeated_rules = defaultdict(float)
         for rule in new_rules_2c:
             repeated_rules[rule.variable, tuple(rule.derivation)] += rule.probability
