@@ -217,6 +217,60 @@ class PCFG(PCFGBase):
             seen_epsilon_vars.add(epsilon_rule.A)
         return new_rules
 
+    def __shorten_rule(rule):
+        """
+        Implements step 3 for a single rule, that is converts a rule X->u1,...,un [q] to a list
+        [X-> u1X1[q] , X1 -> u2X2 [1], ..., X(n-2) -> u(n-1)un [1]].
+        If the right hand side of the rule has at most two items, a list with the same rule is returned
+        @param rule: the rule to convert
+        @type rule: PCFGRule
+        @return: the resulting rules
+        @rtype: list of PCFGRule
+        """
+
+        if len(rule.derivation) <= 2:
+            return [copy.deepcopy(rule)]
+
+        PCFGRuleLst = []
+        LHS = rule.variable
+        for i in range(len(rule.derivation)-2):
+            new_var = LHS + str(i + 1)
+            RHS = [rule.derivation[i], new_var]
+            probability = rule.probability if i == 0 else 1.0
+            PCFGRuleLst.append(PCFGRule(LHS, RHS, probability))
+            LHS = new_var
+
+        PCFGRuleLst.append(PCFGRule(LHS, rule.derivation[-2:]), 1.0)
+
+        return PCFGRuleLst
+
+    @staticmethod
+    def __is_terminal(item):
+        # Returns a boolean indicating if the item is a terminal
+        return item[0] == item[0].lower()
+
+    def __conversion_step_4(self):
+        # 4a) Shorten long rules
+        short_rules = []
+        for rule in self.rules:
+            short_rules.extend(PCFG.__shorten_rule(rule))
+
+        # 4b) Replace terminals on right hand sides of length 2.
+        new_rules = []
+        terminals = set()  # Will keep track of which terminals should be converted to variables
+        terminal_to_var = lambda terminal: 'TERMINAL_' + item.capitalize()
+        for rule in short_rules:
+            rule_copy = copy.deepcopy(rule)
+            if (len(rule_copy.derivation >= 2)):
+                for i in range(2):
+                    item = rule_copy.derivation[i]
+                    if PCFG.__is_terminal(item):
+                        terminals.add(item)
+                        rule_copy.derivation[i] = terminal_to_var(item)
+            new_rules.append(rule_copy)
+        new_rules.extend(PCFGRule(terminal_to_var(terminal), terminal, 1.0) for terminal in terminals)
+        return new_rules
+
     def compute_cnf(self):
         """
         Creates an equivalent near-CNF grammar and stores it in self.cnf.
@@ -234,6 +288,8 @@ class PCFG(PCFGBase):
         
         @postcondition: self.cnf contains a NearCNF object with an equivalent grammar.
         """
+        # TODO: also keep information for mapping derivation trees.
+
         # Initialize an empty near-CNF, then fill it up with rules per the conversion algorithm.
         start_variable = self.start_variable + '_0'
         near = NearCNF(start_variable)
@@ -243,6 +299,13 @@ class PCFG(PCFGBase):
 
         # 2) Remove epsilon rules. We assume there is at most one rule of the form X -> epsilon for each variable X.
         near.rules.extend(self.__conversion_step_2)
+
+        # 3) Remove unit rules -- skipped, since unit rules are allowed in a near-CNF grammar.
+
+        # 4) Shorten long rules and replace terminals on right-hand sides of length two.
+        near.rules.extend(self.__conversion_step_4())
+
+        return near
 
     def get_original_tree(self, tree):
         """
