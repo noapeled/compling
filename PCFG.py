@@ -257,7 +257,7 @@ class PCFG(PCFGBase):
 
         # 4b) Replace terminals on right hand sides of length 2.
         new_rules = []
-        terminals = set()  # Will keep track of which terminals should be converted to variables
+        terminals = set()  # Will keep track of terminals which should correspond to new variables
         terminal_to_var = lambda terminal: 'TERMINAL_' + item.capitalize()
         for rule in short_rules:
             rule_copy = copy.deepcopy(rule)
