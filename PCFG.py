@@ -167,7 +167,6 @@ class PCFG(PCFGBase):
             new_rules_2b.append(new_rule)
 
         # 2.c) Adapt rules where A appears on the right-hand side.
-        # TODO: do not consolidate eventually, but rather add up probabilities as described in class -- the two are not equivalent
         new_rules_2c = [PCFG.__remove_from_rhs(rule, A, epsilon_rule.probability, seen_epsilon_vars)
                         for rule in new_rules_2b]
 
