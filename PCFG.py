@@ -249,8 +249,8 @@ class PCFG(PCFGBase):
 
         PCFGRuleLst = []
         LHS = rule.variable
-        for i in range(len(rule.derivation)-2):
-            new_var = LHS + str(i + 1)
+        for i in range(len(rule.derivation) - 2):
+            new_var = 'SHORTENED_' + rule.variable + str(i + 1)
             RHS = [rule.derivation[i], new_var]
             probability = rule.probability if i == 0 else 1.0
             PCFGRuleLst.append(PCFGRule(LHS, RHS, probability))
@@ -323,6 +323,31 @@ class PCFG(PCFGBase):
 
         return near
 
+    def __shorten_path(self, node):
+        replacement_children = []
+        while True:
+            for rule in self.rules:
+                if rule.variable == node.key:
+                    replacement_children.append(rule.children[0])
+                    node = rule.children[1]
+                    break
+            else:
+                break
+        replacement_children.extend(node.children)
+        return replacement_children
+
+    def __revert_step_4(self, node):
+        for i in range(len(node.children)):
+            child = node.children[i]
+            if child.key.startswith('SHORTENED_'):
+                replacement_child_i = self.__shorten_path(node.children[i])
+                node.children[i:i + len(replacement_child_i)] = replacement_child_i
+
+        for i in range(len(node.children)):
+            child = node.children[i]
+            if child.key.startswith('TERMINAL_'):
+                node.children[i] = ParseTreeNode(child.children[0].key)
+
     def get_original_tree(self, tree):
         """
         Takes a valid parse ParseTree in the grammar of self.cnf and returns the equivalent parse ParseTree in 
@@ -335,10 +360,17 @@ class PCFG(PCFGBase):
         
         @return: If ParseTree is not None, returns the original ParseTree. Otherwise, returns None.
         @rtype: ParseTree or None.
-        
-        @todo: Implement.
         """
-        raise NotImplementedError()
+        if not tree:
+            return
+        modifiable_tree = copy.deepcopy(tree)
+        # 1) Revert short rules to original long rules.
+        for node in modifiable_tree:
+            self.__revert_step_4(node)
+
+        # 1) Get rid of S_0 -> S
+        new_root = tree.root.children[0]
+        new_tree = ParseTree(new_root, tree.probability)
 
 
 class NearCNF(PCFGBase):
@@ -439,6 +471,17 @@ class NearCNF(PCFGBase):
         tree_prob = probs[0][sentence_len][self.start_variable]
         return ParseTree(root, tree_prob)
 
+    def __preprocess_unit_rules(self):
+        unit_rules = defaultdict(list)
+        terminal_rules = defaultdict(dict)
+        for rule in self.rules:
+            if len(rule.derivation) == 1:
+                if PCFG.is_variable(rule.derivation[0]):
+                    unit_rules[rule.variable].append(rule)
+                else:
+                    terminal_rules[rule.variable][rule.derivation[0]] = rule
+        return unit_rules, terminal_rules
+
     def cky_parse(self, sentence):
         """
         Parses the given text using a variant of the CKY algorithm for near-CNF grammars.
@@ -457,6 +500,7 @@ class NearCNF(PCFGBase):
         # every variable var1 such that \exists var2 in the cell so that var1 =>* var2.
         sentence = sentence.split()
         T = len(sentence)
+        unit_rules, terminal_rules = self.__preprocess_unit_rules()
 
         # The 3D tables of dimensions (T+1)x(T+1)x|V| are each implemented as a nested list,
         # such that each cell [i][j] holds a dict which maps variables to probabilities (table t)
@@ -472,7 +516,18 @@ class NearCNF(PCFGBase):
             for rule in self.rules:
                 if rule.derivation == [word_j]:
                     t[j - 1][j][rule.variable] = rule.probability
-                    back[j - 1][j][rule.variable] = (word_j,)
+                    back[j - 1][j][rule.variable] = ([], word_j)
+
+            # Improve using unit rules
+            while True:
+                improved = False
+                for var, rules in unit_rules.items():
+                    for rule in rules:
+                        v = rule.variable
+                        alt_prob = rule.probability * terminal_rules[v][]
+                if not improved:
+                    break
+
             for i in range(j - 2, -1, -1):
                 # First, handle rules of the form A -> BC.
                 for k in range(i + 1, j):

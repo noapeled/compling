@@ -25,27 +25,39 @@ class ParseTree:
     def __repr__(self):
         return "(%f): %r" % (self.probability, self.root)
 
+    def __iter__(self):
+        """
+        An iterator for a pre-order traversal of the tree nodes.
+        """
+        return iter(self.root)
 
 class ParseTreeNode:
     """
     Represents a single node in a PCFG parse tree.
-    
+
     @ivar key: The variable or terminal at this node.
     @type key: string
-    @ivar children: The child nodes of self in the parse tree. If self is a terminal, this 
-        sequence is empty. 
-    @type children: A sequence (e.g. a list) of ParseTreeNode instances. 
+    @ivar children: The child nodes of self in the parse tree. If self is a terminal, this
+        sequence is empty.
+    @type children: A sequence (e.g. a list) of ParseTreeNode instances.
     """
     def __init__(self, key, children = None):
         self.key = key
-        
+
         if children == None:
             children = []
         self.children = children
-    
+
     def __repr__(self):
         if len(self.children) > 0:
             return "[%s %s]" % (self.key, " ".join(map(repr, self.children)))
         else:
             return self.key
 
+    def __iter__(self):
+        """
+        An iterator for a pre-order traversal of the node and its children.
+        """
+        yield self
+        for child in self.children:
+            yield iter(child)
