@@ -58,6 +58,19 @@ class PCFGBase:
             sum_prob_per_var[var] = sum_prob_per_var.get(var, 0) + prob
         return all(sum_prob == 1.0 for sum_prob in sum_prob_per_var.values())
 
+    @staticmethod
+    def is_variable(item):
+        """
+        A utility function, returns True if the given item is a variable, False Otherwise.
+
+        @param item: The item to check.
+        @type item: string
+
+        @return: Check result.
+        @rtype: bool
+        """
+        return len(item) > 0 and item[0].capitalize() == item[0]
+
 class PCFG(PCFGBase):
     """
     Represents a probabilistic context-free grammar.
@@ -75,8 +88,8 @@ class PCFG(PCFGBase):
         
         @param sentence: A sequence of natural language words.
         @type sentence: A sequence (e.g. a tuple) of strings.
-        
-        @return: If sentence is in the language, returns a valid parse ParseTree of the sentence that has maximum 
+
+        @return: If sentence is in the language, returns a valid parse ParseTree of the sentence that has maximum
             probability. Otherwise, returns None.
         @rtype: ParseTree or None.
         
@@ -332,21 +345,76 @@ class NearCNF(PCFGBase):
     """
     Represents a PCFG in near-CNF.
     """
-    
+
+    def __bfs_rules(self):
+        """
+        Helper function for cky_parse. Maps each variable A to a list [(B1, P1), ..., (Br, Pr)], such that:
+        1) Br -> Br-1 -> ... -> B1 -> A is the longest chain of unit rules ending in A.
+        2) Every variable in this chain is different.
+        3) For all j=1..r, Pj is the probability of the unit rule with Bj on the left hand-side in the chain.
+
+        COMPLEXITY: O(G^2), where G = #rules in the grammar
+
+        @return: The mapping.
+        @rtype: dict
+        """
+        mapping = {var: [] for var in self.rules.map(lambda r: r.variable)}
+        for var in mapping:
+            seen_vars = {var}
+            for rule in self.rules:
+                if len(rule.derivation) != 1:
+                    continue
+                rhs = rule.derivation[0]
+                if rhs in seen_vars or not PCFG.is_variable(rhs):
+                    continue
+                mapping[var].append((rhs, rule.probability))
+                seen_vars.add(rhs)
+        return mapping
+
     def cky_parse(self, sentence):
         """
         Parses the given text using a variant of the CKY algorithm for near-CNF grammars.
-        
+
+        COMPLEXITY: O(n^2*G^2 + n^3*G), where: n = #tokens in sentence, G = #rules in grammar.
+
         @param sentence: A sequence of natural language words.
         @type sentence: A sequence (e.g. a tuple) of strings.
         
         @return: If sentence is in the language, returns a valid parse ParseTree of the sentence that has maximum 
             probability. Otherwise, returns None.
         @rtype: ParseTree or None.
-        
-        @todo: Implement.
         """
-        raise NotImplementedError()
+        # This code is based on the variant of CKY from HW9, which can also deal with unit productions.
+        # After filling a cell with variables as per the original CKY algorithm, the variant adds to the cell
+        # every variable var1 such that \exists var2 in the cell so that var1 =>* var2.
+        sentence = sentence.split()
+        T = len(sentence)
+
+        # The 3D tables of dimensions (T+1)x(T+1)x|V| are each implemented as a nested list,
+        # such that each cell [i][j] holds a dict which maps variables to probabilities (table t)
+        # or to backtrack pointers (table back).
+        def init_table():
+            return [[{} for j in range(T + 1)] for i in range(T + 1)]
+        t = init_table()
+        back = init_table()
+
+        for j in range(1, T + 1):
+            # pseudo code: "t[j - 1, j, A] = Prob(A -> Oj) for each A -> Oj in G"
+            word_j = sentence[j]
+            for rule in self.rules:
+                if rule.derivation == [word_j]:
+                    t[j - 1][j][rule.variable] = rule.probability
+            for i in range(j - 2, -1, -1):
+                for k in range(i + 1, j):
+                    for rule in filter(lambda r: len(r.derivation) == 2, self.rules):
+                        A = rule.variable
+                        B, C = rule.derivation
+                        alt_prob = rule.probability * t[i][k][B] * t[k][j][C]
+                        if t[i][j][A] < alt_prob:
+                            t[i][j][A] = alt_prob
+                            back[i][j][A] = (k, B, C)
+                # Handle unit rules.
+
 
 
 class PCFGRule:
