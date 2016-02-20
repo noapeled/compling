@@ -49,11 +49,14 @@ class PCFGBase:
         
         @return: Whether the grammar is valid.
         @rtype: bool
-        
-        @todo: Implement.
         """
-        raise NotImplementedError()
-
+        sum_prob_per_var = {}
+        for rule in self.rules:
+            var, prob = rule.variable, rule.probability
+            if prob < 0:
+                return False
+            sum_prob_per_var[var] = sum_prob_per_var.get(var, 0) + prob
+        return all(sum_prob == 1.0 for sum_prob in sum_prob_per_var.values())
 
 class PCFG(PCFGBase):
     """
