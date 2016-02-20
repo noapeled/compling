@@ -10,7 +10,7 @@ context-free grammars.
 #================================================================================
 import copy
 from collections import defaultdict
-from ParseTree import ParseTree
+from ParseTree import ParseTree, ParseTreeNode
 from itertools import combinations
 
 #================================================================================
@@ -371,6 +371,74 @@ class NearCNF(PCFGBase):
                 seen_vars.add(rhs)
         return mapping
 
+    @staticmethod
+    def __recursive_backtrack(back, i, j, item):
+        """
+
+        @param back:
+        @param i:
+        @param j:
+        @param item:
+        @return:
+        """
+        # Base case: item is a terminal.
+        if not PCFG.is_variable(item):
+            return ParseTreeNode(item)
+
+        # Recursive cases: item is a variable.
+        backpointer = back[i][j][item]
+        children = []
+        curr_children = children
+
+        # backpointer may begin with a list of variables [A1, ..., Ar], corresponding to a chain of unit rules
+        # item -> A1 -> ... -> Ar.
+        if isinstance(backpointer[0], list):
+            chain = backpointer[0]
+            # Convert the chain of unit rules to corresponding child nodes.
+            for var in chain:
+                next_node = ParseTreeNode(var)
+                curr_children.append(next_node)
+                curr_children = next_node.children
+            backpointer = backpointer[1:]
+
+        # backpointer will now have one of the following forms:
+        # Case 0: (str,) = (terminal,) corresponds to directly deriving the terminal.
+        if isinstance(backpointer[0], str):
+            curr_children.append(NearCNF.__recursive_backtrack(back, i, j, backpointer[0]))
+        # Case 1: (int, variable1, variable2) = (k, B, C) as in the CKY algorithm for CNF.
+        else:
+            k, B, C = backpointer
+            curr_children.extend([NearCNF.__recursive_backtrack(back, i, k, B),
+                                  NearCNF.__recursive_backtrack(back, k, j, C)])
+
+        # Finally, return the node rooted at the given item.
+        return ParseTreeNode(item, children)
+
+    def __reconstruct_tree(self, probs, back, sentence_len):
+        """
+        Helper function for cky_parse, reconstructs the maximum probability tree from the given tables.
+
+        @param probs: The table ("t") of probabilities computed in cky_parse.
+        @type probs: list
+
+        @param back: The table of backtrack pointers computed in cky_parse.
+        @type back: list
+
+        @param sentence_len: number of tokens ("T") in the sentence which cky_parse worked on.
+        @type sentence_len: int
+
+        @return: The reconstructed tree, if the sentence which cky_parse worked on is in the language, None otherwise.
+        @rtype: C{ParseTree} or C{NoneType}
+        """
+        # If sentence isn't in the language of the grammar.
+        if not back[0][sentence_len][self.start_variable]:
+            return
+        # Otherwise, reconstruct and return the computed maximum probability tree for the sentence.
+        root = self.__recursive_backtrack(back, 0, sentence_len, self.start_variable)
+        # The tree has probability as computed in cky_parse.
+        tree_prob = probs[0][sentence_len][self.start_variable]
+        return ParseTree(root, tree_prob)
+
     def cky_parse(self, sentence):
         """
         Parses the given text using a variant of the CKY algorithm for near-CNF grammars.
@@ -393,18 +461,20 @@ class NearCNF(PCFGBase):
         # The 3D tables of dimensions (T+1)x(T+1)x|V| are each implemented as a nested list,
         # such that each cell [i][j] holds a dict which maps variables to probabilities (table t)
         # or to backtrack pointers (table back).
-        def init_table():
-            return [[{} for j in range(T + 1)] for i in range(T + 1)]
-        t = init_table()
-        back = init_table()
+        t = [[{} for j in range(T + 1)] for i in range(T + 1)]
+        back = [[None for j in range(T + 1)] for i in range(T + 1)]
+        unit_routes = self.bfs_unit_routes()
 
+        # Build tables.
         for j in range(1, T + 1):
             # pseudo code: "t[j - 1, j, A] = Prob(A -> Oj) for each A -> Oj in G"
             word_j = sentence[j]
             for rule in self.rules:
                 if rule.derivation == [word_j]:
                     t[j - 1][j][rule.variable] = rule.probability
+                    back[j - 1][j][rule.variable] = (word_j,)
             for i in range(j - 2, -1, -1):
+                # First, handle rules of the form A -> BC.
                 for k in range(i + 1, j):
                     for rule in filter(lambda r: len(r.derivation) == 2, self.rules):
                         A = rule.variable
@@ -413,9 +483,19 @@ class NearCNF(PCFGBase):
                         if t[i][j][A] < alt_prob:
                             t[i][j][A] = alt_prob
                             back[i][j][A] = (k, B, C)
-                # Handle unit rules.
+                # Then, handle unit rules.
+                for A, routes in unit_routes.items():
+                    # Note that from here on to the end of the loop, each variable is traversed at most once,
+                    # hence each iteration takes time O(G).
+                    for route in routes:
+                        alt_prob = 1.0
+                        for var, prob in route:
+                            alt_prob *= prob * t[i][j][var]
+                            if t[i][j][A] < alt_prob:
+                                t[i][j][A] = alt_prob
+                                back[i][j][A] = (B,)
 
-
+        return self.__reconstruct_tree(t, back, T)
 
 class PCFGRule:
     """
