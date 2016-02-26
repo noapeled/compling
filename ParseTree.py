@@ -37,13 +37,17 @@ class ParseTreeNode:
 
     @ivar key: The variable or terminal at this node.
     @type key: string
+
+    @ivar rule: The rule in which this node is the left-hand side, if this node is internal.
+    @type rule: C{PCFGRule}
+
     @ivar children: The child nodes of self in the parse tree. If self is a terminal, this
         sequence is empty.
     @type children: A sequence (e.g. a list) of ParseTreeNode instances.
     """
-    def __init__(self, key, children = None):
+    def __init__(self, key, children=None, rule=None):
         self.key = key
-
+        self.rule = rule
         if children == None:
             children = []
         self.children = children

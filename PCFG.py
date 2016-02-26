@@ -14,6 +14,12 @@ from ParseTree import ParseTree, ParseTreeNode
 from itertools import combinations
 
 #================================================================================
+# Constants
+#================================================================================
+TERMINAL_VAR_PREFIX = 'TERMINAL_'
+SHORTENED_VAR_PREFIX = 'SHORTENED_'
+
+#================================================================================
 # Classes
 #================================================================================
 
@@ -102,6 +108,8 @@ class PCFG(PCFGBase):
         cnf_tree = self.cnf.cky_parse(sentence)
         
         return self.get_original_tree(cnf_tree)
+
+# ---------------- FUNCTIONS FOR CONVERTING A GENERAL PCFG TO A NEAR-CNF EQUIVALENT -----------
 
     @staticmethod
     def __remove_from_rhs(rule, A, epsilon_prob, seen_epsilon_vars):
@@ -250,7 +258,7 @@ class PCFG(PCFGBase):
         PCFGRuleLst = []
         LHS = rule.variable
         for i in range(len(rule.derivation) - 2):
-            new_var = 'SHORTENED_' + rule.variable + str(i + 1)
+            new_var = SHORTENED_VAR_PREFIX + rule.variable + str(i + 1)
             RHS = [rule.derivation[i], new_var]
             probability = rule.probability if i == 0 else 1.0
             PCFGRuleLst.append(PCFGRule(LHS, RHS, probability, {"rule": rule}))
@@ -274,7 +282,7 @@ class PCFG(PCFGBase):
         # 4b) Replace terminals on right hand sides of length 2.
         new_rules = []
         terminals = set()  # Will keep track of terminals which should correspond to new variables
-        terminal_to_var = lambda terminal: 'TERMINAL_' + item.capitalize()
+        terminal_to_var = lambda terminal: TERMINAL_VAR_PREFIX + item.capitalize()
         for rule in short_rules:
             rule_copy = rule.copy()
             if (len(rule_copy.derivation >= 2)):
@@ -321,6 +329,36 @@ class PCFG(PCFGBase):
 
         return near
 
+    # --------- FUNCTIONS FOR REVERTING BACK TO THE ORIGINAL GRAMMAR ---------
+
+    def __revert_terminal_variables(self, root):
+        """
+        Reverts terminal variables in the tree rooted at node.
+        @param root: The root of the tree.
+        @type root: C{ParseTreeNode}
+        """
+        var_to_terminal = lambda var_name: var_name[len(TERMINAL_VAR_PREFIX):].lower()
+        for node in root:
+            if node.key.startswith(TERMINAL_VAR_PREFIX):
+                node.key = var_to_terminal(node.key)
+                node.children = []
+
+    def __revert_short_rules(self, root):
+        """
+        Reverts a succession of short rules created during conversion back to the long rule which yielded them.
+        @param root: The root of tree in which to revert the rules.
+        @type root: C{ParseTreeNode}
+        """
+        for node in root:
+            if any(child.key.startswith(SHORTENED_VAR_PREFIX) for child in node.children):
+                new_children = []
+                curr_node = node
+                while curr_node.children[1].key.startswith(SHORTENED_VAR_PREFIX):
+                    new_children.append(curr_node.children[0])
+                    curr_node = curr_node.children[1]
+                new_children.extend(curr_node.children)
+                node.children = new_children
+
     def __shorten_path(self, node):
         replacement_children = []
         while True:
@@ -343,7 +381,7 @@ class PCFG(PCFGBase):
 
         for i in range(len(node.children)):
             child = node.children[i]
-            if child.key.startswith('TERMINAL_'):
+            if child.key.startswith(TERMINAL_VAR_PREFIX):
                 node.children[i] = ParseTreeNode(child.children[0].key)
 
     def __revert_step_2(self, node):
