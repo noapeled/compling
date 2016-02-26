@@ -372,17 +372,9 @@ class PCFG(PCFGBase):
         replacement_children.extend(node.children)
         return replacement_children
 
-    def __revert_step_4(self, node):
-        for i in range(len(node.children)):
-            child = node.children[i]
-            if child.key.startswith('SHORTENED_'):
-                replacement_child_i = self.__shorten_path(node.children[i])
-                node.children[i:i + len(replacement_child_i)] = replacement_child_i
-
-        for i in range(len(node.children)):
-            child = node.children[i]
-            if child.key.startswith(TERMINAL_VAR_PREFIX):
-                node.children[i] = ParseTreeNode(child.children[0].key)
+    def __revert_step_4(self, root):
+        self.__revert_terminal_variables(root)
+        self.__revert_short_rules(root)
 
     def __revert_step_2(self, node):
         pass
@@ -402,15 +394,12 @@ class PCFG(PCFGBase):
         """
         if not tree:
             return
-        modifiable_tree = copy.deepcopy(tree)
-        # 1) Revert short rules to original long rules.
-        for node in modifiable_tree:
-            self.__revert_step_4(node)
+        tree = copy.deepcopy(tree)
+        self.__revert_step_4(tree.root)
 
         # 1) Get rid of S_0 -> S
         new_root = tree.root.children[0]
         new_tree = ParseTree(new_root, tree.probability)
-
 
 
 class NearCNF(PCFGBase):
