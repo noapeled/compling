@@ -149,7 +149,7 @@ class PCFG(PCFGBase):
                         rhs_without_A.append(derivation[i])
                 probability = q * (p ** K) * ((1.0 - p) ** L)
                 without_A.append(PCFGRule(variable, rhs_without_A, probability,
-                                          {"rule": rule, "indexes_to_remove": indexes_to_remove})
+                                          {"rule": rule, "indexes_to_remove": indexes_to_remove}))
         return without_A
 
     @staticmethod
@@ -244,9 +244,8 @@ class PCFG(PCFGBase):
         @return: the resulting rules
         @rtype: list of PCFGRule
         """
-
         if len(rule.derivation) <= 2:
-            return [copy.deepcopy(rule)]
+            return [rule.copy()]
 
         PCFGRuleLst = []
         LHS = rule.variable
@@ -254,10 +253,10 @@ class PCFG(PCFGBase):
             new_var = 'SHORTENED_' + rule.variable + str(i + 1)
             RHS = [rule.derivation[i], new_var]
             probability = rule.probability if i == 0 else 1.0
-            PCFGRuleLst.append(PCFGRule(LHS, RHS, probability))
+            PCFGRuleLst.append(PCFGRule(LHS, RHS, probability, {"rule": rule}))
             LHS = new_var
 
-        PCFGRuleLst.append(PCFGRule(LHS, rule.derivation[-2:]), 1.0)
+        PCFGRuleLst.append(PCFGRule(LHS, rule.derivation[-2:]), 1.0, {"rule": rule})
 
         return PCFGRuleLst
 
@@ -277,7 +276,7 @@ class PCFG(PCFGBase):
         terminals = set()  # Will keep track of terminals which should correspond to new variables
         terminal_to_var = lambda terminal: 'TERMINAL_' + item.capitalize()
         for rule in short_rules:
-            rule_copy = copy.deepcopy(rule)
+            rule_copy = rule.copy()
             if (len(rule_copy.derivation >= 2)):
                 for i in range(2):
                     item = rule_copy.derivation[i]
@@ -348,7 +347,7 @@ class PCFG(PCFGBase):
                 node.children[i] = ParseTreeNode(child.children[0].key)
 
     def __revert_step_2(self, node):
-
+        pass
 
     def get_original_tree(self, tree):
         """
