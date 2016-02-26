@@ -125,7 +125,7 @@ class PCFG(PCFGBase):
         """
         derivation = rule.derivation
         if A not in derivation:
-            return [copy.deepcopy(rule)]
+            return [rule.copy()]
 
         variable = rule.variable
         without_A = []
@@ -148,7 +148,8 @@ class PCFG(PCFGBase):
                     if derivation[i] != A or i not in indexes_to_remove:
                         rhs_without_A.append(derivation[i])
                 probability = q * (p ** K) * ((1.0 - p) ** L)
-                without_A.append(PCFGRule(variable, rhs_without_A, probability))
+                without_A.append(PCFGRule(variable, rhs_without_A, probability,
+                                          {"rule": rule, "indexes_to_remove": indexes_to_remove})
         return without_A
 
     @staticmethod
@@ -177,7 +178,7 @@ class PCFG(PCFGBase):
                 continue
             # 2.b) Normalize probabilities of other rules.
             variable = rule.variable
-            new_rule = copy.deepcopy(rule)
+            new_rule = rule.copy()
             if rule.variable == A:
                 new_rule.probability *= factor
             new_rules_2b.append(new_rule)
@@ -304,8 +305,6 @@ class PCFG(PCFGBase):
         
         @postcondition: self.cnf contains a NearCNF object with an equivalent grammar.
         """
-        # TODO: also keep information for mapping derivation trees.
-
         # Initialize an empty near-CNF, then fill it up with rules per the conversion algorithm.
         start_variable = self.start_variable + '_0'
         near = NearCNF(start_variable)
@@ -348,6 +347,9 @@ class PCFG(PCFGBase):
             if child.key.startswith('TERMINAL_'):
                 node.children[i] = ParseTreeNode(child.children[0].key)
 
+    def __revert_step_2(self, node):
+
+
     def get_original_tree(self, tree):
         """
         Takes a valid parse ParseTree in the grammar of self.cnf and returns the equivalent parse ParseTree in 
@@ -371,6 +373,7 @@ class PCFG(PCFGBase):
         # 1) Get rid of S_0 -> S
         new_root = tree.root.children[0]
         new_tree = ParseTree(new_root, tree.probability)
+
 
 
 class NearCNF(PCFGBase):
@@ -569,7 +572,14 @@ class PCFGRule:
     @type probability: float 
     """
     
-    def __init__(self, variable, derivation, probability):
+    def __init__(self, variable, derivation, probability, original_rule=None):
         self.variable = variable
         self.derivation = derivation
         self.probability = probability
+        # For rules created through conversion from other rules.
+        self.original_rule = original_rule
+
+    def copy(self):
+        new_rule = copy.deepcopy(self)
+        new_rule.original_rule = {"rule": self}
+        return new_rule
