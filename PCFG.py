@@ -81,6 +81,19 @@ class PCFGBase:
         """
         return len(item) > 0 and item[0].capitalize() == item[0]
 
+    @staticmethod
+    def is_terminal(item):
+        """
+        A utility function, returns True if the given item is a terminal, False Otherwise.
+
+        @param item: The item to check.
+        @type item: string
+
+        @return: Check result.
+        @rtype: bool
+        """
+        return not PCFG.is_variable(item)
+
 class PCFG(PCFGBase):
     """
     Represents a probabilistic context-free grammar.
@@ -271,11 +284,6 @@ class PCFG(PCFGBase):
 
         return PCFGRuleLst
 
-    @staticmethod
-    def __is_terminal(item):
-        # Returns a boolean indicating if the item is a terminal
-        return item[0] == item[0].lower()
-
     def __conversion_step_4(self):
         # 4a) Shorten long rules
         short_rules = []
@@ -291,7 +299,7 @@ class PCFG(PCFGBase):
             if (len(rule_copy.derivation >= 2)):
                 for i in range(2):
                     item = rule_copy.derivation[i]
-                    if PCFG.__is_terminal(item):
+                    if PCFG.is_terminal(item):
                         terminals.add(item)
                         rule_copy.derivation[i] = terminal_to_var(item)
             new_rules.append(rule_copy)
@@ -482,67 +490,61 @@ class NearCNF(PCFGBase):
     def __searchable_rules(self):
         searchable_rules = {rule.var: {} for rule in self.rules}
         for rule in self.rules:
-            searchable_rules[rule.var][tuple(rule.derivation)] = rule.probability
+            searchable_rules[rule.var][tuple(rule.derivation)] = rule
         return searchable_rules
 
+    @staticmethod
     def __best_units_derivation(searchable_rules, unit_routes, lhs_var, final_rhs):
         best_route = None
-        best_route_prob = searchable_rules[lhs_var].get(final_rhs, 0.0)
+        get_prob = lambda var, rhs: \
+            searchable_rules[var].get(rhs, {"probability": 0.0}).probability
+        best_route_prob = get_prob(lhs_var, final_rhs)
         for route in unit_routes[lhs_var]:
             full_route = [lhs_var] + route
             curr_prob = 1.0
             for i in range(1, len(full_route)):
                 prev_var = full_route[i - 1]
                 next_var = full_route[i]
-                curr_prob *= searchable_rules[prev_var][(next_var,)]
-                alt_prob = curr_prob * searchable_rules[next_var].get(final_rhs, 0.0)
+                curr_prob *= get_prob(prev_var, (next_var,))
+                alt_prob = curr_prob * get_prob(next_var, final_rhs)
                 if alt_prob > best_route_prob:
-                    best_route = full_route[:i + 1]
+                    best_route = [searchable_rules[full_route[j]][(full_route[j + 1],)]
+                                  for j in range(i + 1)]
+                    best_route.append(searchable_rules[full_route[i]][final_rhs])
                     best_route_prob = alt_prob
         return best_route, best_route_prob
 
     @staticmethod
-    def __recursive_backtrack(back, i, j, item):
+    def __recursive_backtrack(back, i, j, var_or_term):
         """
 
         @param back:
         @param i:
         @param j:
-        @param item:
+        @param var_or_term:
         @return:
         """
-        # Base case: item is a terminal.
-        if not PCFG.is_variable(item):
-            return ParseTreeNode(item)
+        root = ParseTreeNode(var_or_term)
 
-        # Recursive cases: item is a variable.
-        backpointer = back[i][j][item]
-        children = []
-        curr_children = children
+        if PCFG.is_variable(var_or_term):
+            backpointer = back[i][j][var_or_term]
+            curr_node = root
+            route = backpointer["rule"]
+            for rule_index in range(len(route) - 1):
+                rule = route[rule_index]
+                curr_node.rule = rule
+                curr_node.children = [ParseTreeNode(rule.derivation[0])]
+                curr_node = curr_node.children[0]
 
-        # backpointer may begin with a list of variables [A1, ..., Ar], corresponding to a chain of unit rules
-        # item -> A1 -> ... -> Ar.
-        if backpointer.type == UNIT_RULE_BACK_POINTER:
-            chain = backpointer[0]
-            # Convert the chain of unit rules to corresponding child nodes.
-            for var in chain:
-                next_node = ParseTreeNode(var)
-                curr_children.append(next_node)
-                curr_children = next_node.children
-            backpointer = backpointer[1:]
+            rule = route[-1]
+            if backpointer["type"] == ORDINARY_BACK_POINTER:
+                k = backpointer["k"]
+                curr_node.children = [NearCNF.__recursive_backtrack(back, i, k, rule.derivation[0]),
+                                      NearCNF.__recursive_backtrack(back, k, j, rule.derivation[1])]
+            else:
+                curr_node.children = [NearCNF.__recursive_backtrack(back, i, j, rule.derivation[0])]
 
-        # backpointer will now have one of the following forms:
-        # Case 0: (str,) = (terminal,) corresponds to directly deriving the terminal.
-        if isinstance(backpointer[0], str):
-            curr_children.append(NearCNF.__recursive_backtrack(back, i, j, backpointer[0]))
-        # Case 1: (int, variable1, variable2) = (k, B, C) as in the CKY algorithm for CNF.
-        else:
-            k, B, C = backpointer
-            curr_children.extend([NearCNF.__recursive_backtrack(back, i, k, B),
-                                  NearCNF.__recursive_backtrack(back, k, j, C)])
-
-        # Finally, return the node rooted at the given item.
-        return ParseTreeNode(item, children)
+        return root
 
     def __reconstruct_tree(self, probs, back, sentence_len):
         """
@@ -605,7 +607,7 @@ class NearCNF(PCFGBase):
                 if rule.derivation == [word_j]:
                     best_route, best_route_prob = NearCNF.__best_units_derivation(
                             searchable_rules, unit_routes, rule.variable, (word_j,))
-                    t[j - 1][j][rule.variable] =  best_route_prob
+                    t[j - 1][j][rule.variable] = best_route_prob
                     back[j - 1][j][rule.variable] = {"type": TERMINAL_BACK_POINTER, "route": best_route}
 
             # Derive non-terminal rules.
