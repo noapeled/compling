@@ -22,7 +22,6 @@ EPSILON = ''
 
 TERMINAL_BACK_POINTER = 'TERMINAL_BACK_POINTER'
 ORDINARY_BACK_POINTER = 'ORDINARY_BACK_POINTER'
-UNIT_RULE_BACK_POINTER = 'UNIT_RULE_BACK_POINTER'
 
 #================================================================================
 # Classes
@@ -450,7 +449,7 @@ class NearCNF(PCFGBase):
                 self.neighbors[rule.variable].append(rule.derivation[0], rule.probability)
 
     @staticmethod
-    def __dijkstra_max_prob(unit_rules_graph, source_var):
+    def __dijkstra_max_prob_tree(unit_rules_graph, source_var):
         """
 
         @param unit_rules_graph:
@@ -476,7 +475,8 @@ class NearCNF(PCFGBase):
 
     def __compute_unit_routes(self):
         unit_rules_graph = NearCNF.__UnitRulesGraph(self)
-        unit_routes = {var: None for var in unit_rules_graph.vertices}
+        unit_routes = {var: self.__dijkstra_max_prob_tree(unit_rules_graph, var)
+                       for var in unit_rules_graph.vertices}
         return unit_routes
 
     def __searchable_rules(self):
@@ -587,55 +587,39 @@ class NearCNF(PCFGBase):
         # every variable var1 such that \exists var2 in the cell so that var1 =>* var2.
         sentence = sentence.split()
         T = len(sentence)
-        unit_rules, terminal_rules = self.__preprocess_unit_rules()
 
         # The 3D tables of dimensions (T+1)x(T+1)x|V| are each implemented as a nested list,
         # such that each cell [i][j] holds a dict which maps variables to probabilities (table t)
         # or to backtrack pointers (table back).
         t = [[{} for j in range(T + 1)] for i in range(T + 1)]
         back = [[None for j in range(T + 1)] for i in range(T + 1)]
-        unit_routes = self.bfs_unit_routes()
+
+        unit_routes = self.__compute_unit_routes()
+        searchable_rules = self.__searchable_rules()
 
         # Build tables.
         for j in range(1, T + 1):
-            # pseudo code: "t[j - 1, j, A] = Prob(A -> Oj) for each A -> Oj in G"
+            # Derive individual letters from the sentence.
             word_j = sentence[j]
             for rule in self.rules:
                 if rule.derivation == [word_j]:
-                    t[j - 1][j][rule.variable] = rule.probability
-                    back[j - 1][j][rule.variable] = {"type": TERMINAL_BACK_POINTER, "rule": rule}
+                    best_route, best_route_prob = NearCNF.__best_units_derivation(
+                            searchable_rules, unit_routes, rule.variable, (word_j,))
+                    t[j - 1][j][rule.variable] =  best_route_prob
+                    back[j - 1][j][rule.variable] = {"type": TERMINAL_BACK_POINTER, "route": best_route}
 
-            # Improve using unit rules
-            while True:
-                improved = False
-                for var, rules in unit_rules.items():
-                    for rule in rules:
-                        v = rule.variable
-                        alt_prob = rule.probability * terminal_rules[v][]
-                if not improved:
-                    break
-
+            # Derive non-terminal rules.
             for i in range(j - 2, -1, -1):
-                # First, handle rules of the form A -> BC.
                 for k in range(i + 1, j):
                     for rule in filter(lambda r: len(r.derivation) == 2, self.rules):
                         A = rule.variable
                         B, C = rule.derivation
-                        alt_prob = rule.probability * t[i][k][B] * t[k][j][C]
+                        best_route, best_route_prob = NearCNF.__best_units_derivation(
+                            searchable_rules, unit_routes, A, (B, C))
+                        alt_prob = best_route_prob * t[i][k][B] * t[k][j][C]
                         if t[i][j][A] < alt_prob:
                             t[i][j][A] = alt_prob
-                            back[i][j][A] = {"type": ORDINARY_BACK_POINTER, "k": k, "rule": rule}
-                # Then, handle unit rules.
-                for A, routes in unit_routes.items():
-                    # Note that from here on to the end of the loop, each variable is traversed at most once,
-                    # hence each iteration takes time O(G).
-                    for route in routes:
-                        alt_prob = 1.0
-                        for var, prob in route:
-                            alt_prob *= prob * t[i][j][var]
-                            if t[i][j][A] < alt_prob:
-                                t[i][j][A] = alt_prob
-                                back[i][j][A] = {"type": UNIT_RULE_BACK_POINTER, "rule": rule}
+                            back[i][j][A] = {"type": ORDINARY_BACK_POINTER, "k": k, "route": best_route}
 
         return self.__reconstruct_tree(t, back, T)
 
