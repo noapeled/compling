@@ -32,8 +32,6 @@ def parse(text, grammar):
     @return: Parse trees, one for each sentence in the text. The i-th tree is a parse with 
         maximum probability for the i-th sentence in the text according to the provided grammar.
     @rtype: An iterable (e.g. a list) of ParseTree instances.
-    
-    @todo: Implement
     """
     raise NotImplementedError()
 
@@ -55,44 +53,45 @@ if __name__ == "__main__":
                    'few captains become a prime man.'
 
     example_grammar = PCFG(start_variable="S", rules=[
-        PCFGRule('S', ['NP', 'VP']),
+        PCFGRule('S', ['NP', 'VP'], 0.9),
+        PCFGRule('S', ['VP', 'NP'], 0.1),
 
-        PCFGRule('NP', ['DET', 'N']),
-        PCFGRule('NP', ['N']),
+        PCFGRule('NP', ['DET', 'N'], 0.5),
+        PCFGRule('NP', ['N'], 0.5),
 
-        PCFGRule('VP', ['V', 'NP']),
-        PCFGRule('VP', ['V']),
-        PCFGRule('VP', ['V', 'PP']),
-        PCFGRule('VP', ['V', 'ADV']),
+        PCFGRule('VP', ['V', 'NP'], 0.3),
+        PCFGRule('VP', ['V'], 0.1),
+        PCFGRule('VP', ['V', 'PP'], 0.2),
+        PCFGRule('VP', ['V', 'ADV'], 0.4),
 
-        PCFGRule('PP', ['P', 'NP']),
+        PCFGRule('PP', ['P', 'NP'], 1.0),
 
-        PCFGRule('DET', ['the']),
-        PCFGRule('DET', ['a']),
-        PCFGRule('DET', ['an']),
+        PCFGRule('DET', ['the'], 0.5),
+        PCFGRule('DET', ['a'], 0.25),
+        PCFGRule('DET', ['an'], 0.25),
 
-        PCFGRule('ADJ', ['few']),
-        PCFGRule('ADJ', ['old']),
-        PCFGRule('ADJ', ['prime']),
+        PCFGRule('ADJ', ['few'], 0.33),
+        PCFGRule('ADJ', ['old'], 0.33),
+        PCFGRule('ADJ', ['prime'], 0.34),
 
-        PCFGRule('N', ['ADJ', 'N']),
-        PCFGRule('N', ['man']),
-        PCFGRule('N', ['old']),
-        PCFGRule('N', ['boat']),
-        PCFGRule('N', ['prime']),
-        PCFGRule('N', ['captains']),
-        PCFGRule('N', ['seven']),
-        PCFGRule('N', ['number']),
+        PCFGRule('N', ['ADJ', 'N'], 0.3),
+        PCFGRule('N', ['man'], 0.1),
+        PCFGRule('N', ['old'], 0.1),
+        PCFGRule('N', ['boat'], 0.1),
+        PCFGRule('N', ['prime'], 0.1),
+        PCFGRule('N', ['captains'], 0.1),
+        PCFGRule('N', ['seven'], 0.1),
+        PCFGRule('N', ['number'], 0.1),
 
-        PCFGRule('ADV', ['few']),
+        PCFGRule('ADV', ['few'], 1.0),
 
-        PCFGRule('P', ['in']),
+        PCFGRule('P', ['in'], 1.0),
 
-        PCFGRule('V', ['man']),
-        PCFGRule('V', ['is']),
-        PCFGRule('V', ['are']),
-        PCFGRule('V', ['number']),
-        PCFGRule('V', ['become']),
+        PCFGRule('V', ['man'], 0.1),
+        PCFGRule('V', ['is'], 0.3),
+        PCFGRule('V', ['are'], 0.3),
+        PCFGRule('V', ['number'], 0.1),
+        PCFGRule('V', ['become'], 0.2),
     ])
 
     trees = parse(example_text, example_grammar)
