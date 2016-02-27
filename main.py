@@ -33,8 +33,9 @@ def parse(text, grammar):
         maximum probability for the i-th sentence in the text according to the provided grammar.
     @rtype: An iterable (e.g. a list) of ParseTree instances.
     """
-    raise NotImplementedError()
-
+    sentences = [s.rstrip() for s in text.split('.')]
+    derivation_trees = [grammar.parse(sentence) for sentence in sentences]
+    return derivation_trees
 
 #================================================================================
 # Main
@@ -74,14 +75,14 @@ if __name__ == "__main__":
         PCFGRule('ADJ', ['old'], 0.33),
         PCFGRule('ADJ', ['prime'], 0.34),
 
-        PCFGRule('N', ['ADJ', 'N'], 0.3),
-        PCFGRule('N', ['man'], 0.1),
-        PCFGRule('N', ['old'], 0.1),
-        PCFGRule('N', ['boat'], 0.1),
-        PCFGRule('N', ['prime'], 0.1),
-        PCFGRule('N', ['captains'], 0.1),
-        PCFGRule('N', ['seven'], 0.1),
-        PCFGRule('N', ['number'], 0.1),
+        PCFGRule('N', ['ADJ', 'N'], 0.25),
+        PCFGRule('N', ['man'], 0.125),
+        PCFGRule('N', ['old'], 0.125),
+        PCFGRule('N', ['boat'], 0.0625),
+        PCFGRule('N', ['prime'], 0.125),
+        PCFGRule('N', ['captains'], 0.125),
+        PCFGRule('N', ['seven'], 0.125),
+        PCFGRule('N', ['number'], 0.0625),
 
         PCFGRule('ADV', ['few'], 1.0),
 
@@ -93,6 +94,7 @@ if __name__ == "__main__":
         PCFGRule('V', ['number'], 0.1),
         PCFGRule('V', ['become'], 0.2),
     ])
+    assert example_grammar.is_valid()
 
     trees = parse(example_text, example_grammar)
     for tree in trees:
