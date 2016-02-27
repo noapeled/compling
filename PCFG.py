@@ -432,7 +432,7 @@ class NearCNF(PCFGBase):
     Represents a PCFG in near-CNF.
     """
 
-    class UnitRulesGraph:
+    class __UnitRulesGraph:
         """
 
         """
@@ -449,7 +449,8 @@ class NearCNF(PCFGBase):
             for rule in unit_rules:
                 self.neighbors[rule.variable].append(rule.derivation[0], rule.probability)
 
-    def dijkstra_max_prob(self, unit_rules_graph, source_var):
+    @staticmethod
+    def __dijkstra_max_prob(unit_rules_graph, source_var):
         """
 
         @param unit_rules_graph:
@@ -459,7 +460,7 @@ class NearCNF(PCFGBase):
         variables = unit_rules_graph.vertices
         dist = {var: None for var in variables}
         dist[source_var] = 1.0
-        previous = {var: None for var in variables}
+        tree_nodes = {var: ParseTreeNode(var) for var in variables}
         queue = set(variables)
         while queue:
             max_dist, max_dist_var = max((d, v) for v, d in dist.items() if d is not None)
@@ -470,33 +471,35 @@ class NearCNF(PCFGBase):
                 alt_dist = dist[max_dist_var] * prob
                 if dist[neighbor] is None or alt_dist > dist[neighbor]:
                     dist[neighbor] = alt_dist
-                    previous[neighbor] = max_dist_var
-            return dist, previous
+                    tree_nodes[max_dist_var].children.append(tree_nodes[neighbor])
+        return ParseTree(tree_nodes[source_var])
 
-    def __bfs_rules(self):
-        """
-        Helper function for cky_parse. Maps each variable A to a list [(B1, P1), ..., (Br, Pr)], such that:
-        1) Br -> Br-1 -> ... -> B1 -> A is the longest chain of unit rules ending in A.
-        2) Every variable in this chain is different.
-        3) For all j=1..r, Pj is the probability of the unit rule with Bj on the left hand-side in the chain.
+    def __compute_unit_routes(self):
+        unit_rules_graph = NearCNF.__UnitRulesGraph(self)
+        unit_routes = {var: None for var in unit_rules_graph.vertices}
+        return unit_routes
 
-        COMPLEXITY: O(G^2), where G = #rules in the grammar
+    def __searchable_rules(self):
+        searchable_rules = {rule.var: {} for rule in self.rules}
+        for rule in self.rules:
+            searchable_rules[rule.var][tuple(rule.derivation)] = rule.probability
+        return searchable_rules
 
-        @return: The mapping.
-        @rtype: dict
-        """
-        mapping = {var: [] for var in self.rules.map(lambda r: r.variable)}
-        for var in mapping:
-            seen_vars = {var}
-            for rule in self.rules:
-                if len(rule.derivation) != 1:
-                    continue
-                rhs = rule.derivation[0]
-                if rhs in seen_vars or not PCFG.is_variable(rhs):
-                    continue
-                mapping[var].append((rhs, rule.probability))
-                seen_vars.add(rhs)
-        return mapping
+    def __best_units_derivation(searchable_rules, unit_routes, lhs_var, final_rhs):
+        best_route = None
+        best_route_prob = searchable_rules[lhs_var].get(final_rhs, 0.0)
+        for route in unit_routes[lhs_var]:
+            full_route = [lhs_var] + route
+            curr_prob = 1.0
+            for i in range(1, len(full_route)):
+                prev_var = full_route[i - 1]
+                next_var = full_route[i]
+                curr_prob *= searchable_rules[prev_var][(next_var,)]
+                alt_prob = curr_prob * searchable_rules[next_var].get(final_rhs, 0.0)
+                if alt_prob > best_route_prob:
+                    best_route = full_route[:i + 1]
+                    best_route_prob = alt_prob
+        return best_route, best_route_prob
 
     @staticmethod
     def __recursive_backtrack(back, i, j, item):
@@ -565,17 +568,6 @@ class NearCNF(PCFGBase):
         # The tree has probability as computed in cky_parse.
         tree_prob = probs[0][sentence_len][self.start_variable]
         return ParseTree(root, tree_prob)
-
-    def __preprocess_unit_rules(self):
-        unit_rules = defaultdict(list)
-        terminal_rules = defaultdict(dict)
-        for rule in self.rules:
-            if len(rule.derivation) == 1:
-                if PCFG.is_variable(rule.derivation[0]):
-                    unit_rules[rule.variable].append(rule)
-                else:
-                    terminal_rules[rule.variable][rule.derivation[0]] = rule
-        return unit_rules, terminal_rules
 
     def cky_parse(self, sentence):
         """
