@@ -11,7 +11,7 @@ An implementation of PCFG parsing.
 # Imports
 #================================================================================
 
-from PCFG import PCFG, PCFGRule
+from PCFG import PCFG, PCFGRule, EPSILON
 
 
 #================================================================================
@@ -71,9 +71,9 @@ if __name__ == "__main__":
         PCFGRule('DET', ['a'], 0.25),
         PCFGRule('DET', ['an'], 0.25),
 
-        PCFGRule('ADJ', ['few'], 0.33),
-        PCFGRule('ADJ', ['old'], 0.33),
-        PCFGRule('ADJ', ['prime'], 0.34),
+        PCFGRule('ADJ', ['few'], 0.625),
+        PCFGRule('ADJ', ['old'], 0.25),
+        PCFGRule('ADJ', ['prime'], 0.125),
 
         PCFGRule('N', ['ADJ', 'N'], 0.25),
         PCFGRule('N', ['man'], 0.125),
@@ -84,7 +84,8 @@ if __name__ == "__main__":
         PCFGRule('N', ['seven'], 0.125),
         PCFGRule('N', ['number'], 0.0625),
 
-        PCFGRule('ADV', ['few'], 1.0),
+        PCFGRule('ADV', ['few'], 0.8),
+        PCFGRule('ADV', [EPSILON], 0.2),  # Epsilon rule
 
         PCFGRule('P', ['in'], 1.0),
 

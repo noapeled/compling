@@ -94,6 +94,13 @@ class PCFGBase:
         """
         return not PCFG.is_variable(item)
 
+    @staticmethod
+    def get_searchable_rules(rules):
+        searchable_rules = {rule.variable: {} for rule in rules}
+        for rule in rules:
+            searchable_rules[rule.variable][tuple(rule.derivation)] = rule
+        return searchable_rules
+
 class PCFG(PCFGBase):
     """
     Represents a probabilistic context-free grammar.
@@ -235,7 +242,7 @@ class PCFG(PCFGBase):
         @rtype: string or NoneType
         """
         for rule in rules:
-            if rule.variable not in seen_epsilon_vars and not rule.derivation:
+            if rule.variable not in seen_epsilon_vars and rule.derivation == [EPSILON]:
                 return rule
 
     def __conversion_step_2(self):
@@ -255,7 +262,7 @@ class PCFG(PCFGBase):
             if not epsilon_rule:
                 break
             new_rules = PCFG.__remove_epsilon_rule(epsilon_rule, new_rules, seen_epsilon_vars)
-            seen_epsilon_vars.add(epsilon_rule.A)
+            seen_epsilon_vars.add(epsilon_rule.variable)
         return new_rules
 
     def __shorten_rule(rule):
@@ -338,7 +345,8 @@ class PCFG(PCFGBase):
         # 4) Shorten long rules and replace terminals on right-hand sides of length two.
         near.rules.extend(self.__conversion_step_4())
 
-        return near
+        # Store the near-CNF grammar in self.
+        self.cnf = near
 
     # --------- FUNCTIONS FOR REVERTING BACK TO THE ORIGINAL GRAMMAR ---------
 
@@ -454,7 +462,7 @@ class NearCNF(PCFGBase):
             self.vertices = frozenset(rule.variable for rule in unit_rules)
             self.neighbors = {v: [] for v in self.vertices}
             for rule in unit_rules:
-                self.neighbors[rule.variable].append(rule.derivation[0], rule.probability)
+                self.neighbors[rule.variable].append((rule.derivation[0], rule.probability))
 
     @staticmethod
     def __dijkstra_max_prob_tree(unit_rules_graph, source_var):
@@ -465,15 +473,15 @@ class NearCNF(PCFGBase):
         @return:
         """
         variables = unit_rules_graph.vertices
-        dist = {var: None for var in variables}
+        dist = {var: -1.0 for var in variables}
         dist[source_var] = 1.0
         tree_nodes = {var: ParseTreeNode(var) for var in variables}
-        queue = set(variables)
-        while queue:
-            max_dist, max_dist_var = max((d, v) for v, d in dist.items() if d is not None)
-            queue.remove(max_dist_var)
+        pending_vars = set(variables)
+        while pending_vars:
+            max_dist, max_dist_var = max((d, v) for v, d in dist.items() if v in pending_vars)
+            pending_vars.remove(max_dist_var)
             for neighbor, prob in unit_rules_graph.neighbors[max_dist_var]:
-                if neighbor not in queue:
+                if neighbor not in pending_vars:
                     continue
                 alt_dist = dist[max_dist_var] * prob
                 if dist[neighbor] is None or alt_dist > dist[neighbor]:
@@ -486,12 +494,6 @@ class NearCNF(PCFGBase):
         unit_routes = {var: self.__dijkstra_max_prob_tree(unit_rules_graph, var)
                        for var in unit_rules_graph.vertices}
         return unit_routes
-
-    def __searchable_rules(self):
-        searchable_rules = {rule.var: {} for rule in self.rules}
-        for rule in self.rules:
-            searchable_rules[rule.var][tuple(rule.derivation)] = rule
-        return searchable_rules
 
     @staticmethod
     def __best_units_derivation(searchable_rules, unit_routes, lhs_var, final_rhs):
@@ -597,7 +599,7 @@ class NearCNF(PCFGBase):
         back = [[None for j in range(T + 1)] for i in range(T + 1)]
 
         unit_routes = self.__compute_unit_routes()
-        searchable_rules = self.__searchable_rules()
+        searchable_rules = PCFG.get_searchable_rules(self.rules)
 
         # Build tables.
         for j in range(1, T + 1):
