@@ -105,10 +105,9 @@ class PCFG(PCFGBase):
         """
         if self.cnf is None:
             self.compute_cnf()
-        
         cnf_tree = self.cnf.cky_parse(sentence)
-        
-        return self.get_original_tree(cnf_tree)
+        original_tree = self.get_original_tree(cnf_tree)
+        return original_tree
 
 # ---------------- FUNCTIONS FOR CONVERTING A GENERAL PCFG TO A NEAR-CNF EQUIVALENT -----------
 
@@ -419,11 +418,10 @@ class PCFG(PCFGBase):
         tree = copy.deepcopy(tree)
         self.__revert_step_4(tree.root)
         self.__revert_step_2(tree.root)
-
-        # 1) Get rid of S_0 -> S
+        # Get rid of step 1, namely get rid of S_0 -> S
         new_root = tree.root.children[0]
         new_tree = ParseTree(new_root, tree.probability)
-
+        return new_tree
 
 class NearCNF(PCFGBase):
     """
