@@ -296,7 +296,7 @@ class PCFG(PCFGBase):
         terminal_to_var = lambda terminal: TERMINAL_VAR_PREFIX + item.capitalize()
         for rule in short_rules:
             rule_copy = rule.copy()
-            if (len(rule_copy.derivation >= 2)):
+            if (len(rule_copy.derivation) >= 2):
                 for i in range(2):
                     item = rule_copy.derivation[i]
                     if PCFG.is_terminal(item):
@@ -331,7 +331,7 @@ class PCFG(PCFGBase):
         near.rules.append(PCFGRule(start_variable, self.start_variable, 1.0))
 
         # 2) Remove epsilon rules. We assume there is at most one rule of the form X -> epsilon for each variable X.
-        near.rules.extend(self.__conversion_step_2)
+        near.rules.extend(self.__conversion_step_2())
 
         # 3) Remove unit rules -- skipped, since unit rules are allowed in a near-CNF grammar.
 
