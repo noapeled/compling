@@ -57,15 +57,16 @@ if __name__ == "__main__":
         PCFGRule('S', ['NP', 'VP'], 0.9),
         PCFGRule('S', ['VP', 'NP'], 0.1),
 
-        PCFGRule('NP', ['DET', 'N'], 0.5),
-        PCFGRule('NP', ['N'], 0.5),
+        PCFGRule('NP', ['DET', 'N'], 0.325),
+        PCFGRule('NP', ['N'], 0.325),
+        PCFGRule('NP', ['DET', 'ADJ', 'N'], 0.35),  # Rule too long for Near-CNF
 
         PCFGRule('VP', ['V', 'NP'], 0.3),
-        PCFGRule('VP', ['V'], 0.1),
-        PCFGRule('VP', ['V', 'PP'], 0.2),
-        PCFGRule('VP', ['V', 'ADV'], 0.4),
+        PCFGRule('VP', ['V'], 0.5),
+        PCFGRule('VP', ['V', 'PP', 'ADV'], 0.2),  # Rule too long for Near-CNF
 
-        PCFGRule('PP', ['P', 'NP'], 1.0),
+        PCFGRule('PP', ['P', 'NP'], 0.6),
+        PCFGRule('PP', ['after', 'NP'], 0.4),  # Rule with terminal and variable on right-hand side
 
         PCFGRule('DET', ['the'], 0.5),
         PCFGRule('DET', ['a'], 0.25),
@@ -75,13 +76,12 @@ if __name__ == "__main__":
         PCFGRule('ADJ', ['old'], 0.25),
         PCFGRule('ADJ', ['prime'], 0.125),
 
-        PCFGRule('N', ['ADJ', 'N'], 0.25),
         PCFGRule('N', ['man'], 0.125),
         PCFGRule('N', ['old'], 0.125),
         PCFGRule('N', ['boat'], 0.0625),
         PCFGRule('N', ['prime'], 0.125),
         PCFGRule('N', ['captains'], 0.125),
-        PCFGRule('N', ['seven'], 0.125),
+        PCFGRule('N', ['seven'], 0.375),
         PCFGRule('N', ['number'], 0.0625),
 
         PCFGRule('ADV', ['few'], 0.8),

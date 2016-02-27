@@ -79,7 +79,7 @@ class PCFGBase:
         @return: Check result.
         @rtype: bool
         """
-        return len(item) > 0 and item[0].capitalize() == item[0]
+        return len(item) > 0 and item[0].upper() == item[0]
 
     @staticmethod
     def is_terminal(item):
@@ -205,7 +205,7 @@ class PCFG(PCFGBase):
         new_rules_2b = []
         for rule in rules:
             # 2.a) Don't take the given epsilon rule into the result rules.
-            if rule.variable == A and not rule.derivation:
+            if rule.variable == A and rule.derivation == [EPSILON]:
                 continue
             # 2.b) Normalize probabilities of other rules.
             variable = rule.variable
@@ -224,7 +224,7 @@ class PCFG(PCFGBase):
         repeated_rules = defaultdict(float)
         for rule in new_rules_2c:
             repeated_rules[rule.variable, tuple(rule.derivation)] += rule.probability
-        new_rules = [PCFGRule(v, d, repeated_rules[v, d]) for v, d in repeated_rules]
+        new_rules = [PCFGRule(v, list(d), repeated_rules[v, d]) for v, d in repeated_rules]
         return new_rules
 
     @staticmethod
@@ -245,7 +245,8 @@ class PCFG(PCFGBase):
             if rule.variable not in seen_epsilon_vars and rule.derivation == [EPSILON]:
                 return rule
 
-    def __conversion_step_2(self):
+    @staticmethod
+    def __conversion_step_2(rules):
         """
         For internal use: step 2 of the conversion algorithm, removes epsilon rules and changes other rules accordingly.
         We assume there is at most one rule of the form X -> epsilon for each variable X.
@@ -255,10 +256,10 @@ class PCFG(PCFGBase):
         """
         # Set of variables for which epsilon rules have been removed already
         seen_epsilon_vars = set()
-        new_rules = self.rules
+        new_rules = rules[:]
         while True:
             # Find a variable A which has a rule A -> epsilon and which we haven't removed already
-            epsilon_rule = self.__find_unseen_epsilon_rule(new_rules, seen_epsilon_vars)
+            epsilon_rule = PCFG.__find_unseen_epsilon_rule(new_rules, seen_epsilon_vars)
             if not epsilon_rule:
                 break
             new_rules = PCFG.__remove_epsilon_rule(epsilon_rule, new_rules, seen_epsilon_vars)
@@ -281,29 +282,30 @@ class PCFG(PCFGBase):
         PCFGRuleLst = []
         LHS = rule.variable
         for i in range(len(rule.derivation) - 2):
-            new_var = SHORTENED_VAR_PREFIX + rule.variable + str(i + 1)
+            new_var = SHORTENED_VAR_PREFIX + rule.variable + '_' + str(i + 1)
             RHS = [rule.derivation[i], new_var]
             probability = rule.probability if i == 0 else 1.0
             PCFGRuleLst.append(PCFGRule(LHS, RHS, probability, {"rule": rule}))
             LHS = new_var
 
-        PCFGRuleLst.append(PCFGRule(LHS, rule.derivation[-2:]), 1.0, {"rule": rule})
+        PCFGRuleLst.append(PCFGRule(LHS, rule.derivation[-2:], 1.0, {"rule": rule}))
 
         return PCFGRuleLst
 
-    def __conversion_step_4(self):
+    @staticmethod
+    def __conversion_step_4(rules):
         # 4a) Shorten long rules
         short_rules = []
-        for rule in self.rules:
+        for rule in rules:
             short_rules.extend(PCFG.__shorten_rule(rule))
 
         # 4b) Replace terminals on right hand sides of length 2.
         new_rules = []
         terminals = set()  # Will keep track of terminals which should correspond to new variables
-        terminal_to_var = lambda terminal: TERMINAL_VAR_PREFIX + item.capitalize()
+        terminal_to_var = lambda terminal: TERMINAL_VAR_PREFIX + terminal.upper()
         for rule in short_rules:
             rule_copy = rule.copy()
-            if (len(rule_copy.derivation) >= 2):
+            if (len(rule_copy.derivation) == 2):
                 for i in range(2):
                     item = rule_copy.derivation[i]
                     if PCFG.is_terminal(item):
@@ -331,22 +333,22 @@ class PCFG(PCFGBase):
         @postcondition: self.cnf contains a NearCNF object with an equivalent grammar.
         """
         # Initialize an empty near-CNF, then fill it up with rules per the conversion algorithm.
-        start_variable = self.start_variable + '_0'
-        near = NearCNF(start_variable)
+        new_rules = self.rules[:]
 
         # 1) Add rule S_0 -> S [1]
-        near.rules.append(PCFGRule(start_variable, self.start_variable, 1.0))
+        start_variable = self.start_variable + '_0'
+        new_rules.append(PCFGRule(start_variable, [self.start_variable], 1.0))
 
         # 2) Remove epsilon rules. We assume there is at most one rule of the form X -> epsilon for each variable X.
-        near.rules.extend(self.__conversion_step_2())
+        new_rules = PCFG.__conversion_step_2(new_rules)
 
         # 3) Remove unit rules -- skipped, since unit rules are allowed in a near-CNF grammar.
 
         # 4) Shorten long rules and replace terminals on right-hand sides of length two.
-        near.rules.extend(self.__conversion_step_4())
+        new_rules = PCFG.__conversion_step_4(new_rules)
 
         # Store the near-CNF grammar in self.
-        self.cnf = near
+        self.cnf = NearCNF(start_variable, new_rules)
 
     # --------- FUNCTIONS FOR REVERTING BACK TO THE ORIGINAL GRAMMAR ---------
 
@@ -653,5 +655,6 @@ class PCFGRule:
 
     def copy(self):
         new_rule = copy.deepcopy(self)
-        new_rule.original_rule = {"rule": self}
+        if not new_rule.original_rule:
+            new_rule.original_rule = {"rule": self}
         return new_rule
