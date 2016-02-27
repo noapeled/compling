@@ -18,6 +18,7 @@ from itertools import combinations
 #================================================================================
 TERMINAL_VAR_PREFIX = 'TERMINAL_'
 SHORTENED_VAR_PREFIX = 'SHORTENED_'
+EPSILON = ''
 
 #================================================================================
 # Classes
@@ -44,7 +45,7 @@ class PCFGBase:
         """
         self.start_variable = start_variable
         
-        if rules == None:
+        if rules is None:
             rules = []
         self.rules = rules
     
@@ -102,7 +103,7 @@ class PCFG(PCFGBase):
         @precondition: self.cnf is None or self.cnf is up-to-date. If the grammar has been changed since self.cnf 
             was computed last time, the user must set self.cnf back to None before calling parse.
         """
-        if self.cnf == None:
+        if self.cnf is None:
             self.compute_cnf()
         
         cnf_tree = self.cnf.cky_parse(sentence)
@@ -157,7 +158,7 @@ class PCFG(PCFGBase):
                         rhs_without_A.append(derivation[i])
                 probability = q * (p ** K) * ((1.0 - p) ** L)
                 without_A.append(PCFGRule(variable, rhs_without_A, probability,
-                                          {"rule": rule, "indexes_to_remove": indexes_to_remove}))
+                        {"rule": rule, "indexes_to_remove": indexes_to_remove, "removed_variable": A}))
         return without_A
 
     @staticmethod
@@ -373,11 +374,32 @@ class PCFG(PCFGBase):
         return replacement_children
 
     def __revert_step_4(self, root):
+        """
+        Reverts step 4: terminal variables and short rules.
+
+        @param root: root of the tree in which to revert.
+        @type root: C{ParseTreeNode}
+        """
         self.__revert_terminal_variables(root)
         self.__revert_short_rules(root)
 
-    def __revert_step_2(self, node):
-        pass
+    def __revert_step_2(self, root):
+        """
+        Reverts step 2: epsilon rules.
+
+        @param root: root of the tree in which to revert.
+        @type root: C{ParseTreeNode}
+        """
+        for node in root:
+            try:
+                indexes_to_revert = node.rule.original_rule.indexes_to_remove
+                variable_to_revert = node.rule.original_rule.removed_variable
+                for index in indexes_to_revert:
+                    node.children.insert(index, ParseTreeNode(
+                            variable_to_revert, [ParseTreeNode(EPSILON)]))
+                node.rule.original_rule = None
+            except AttributeError:
+                continue
 
     def get_original_tree(self, tree):
         """
@@ -386,8 +408,8 @@ class PCFG(PCFGBase):
         
         In particular, the output parse ParseTree has the same probability as the input parse ParseTree. 
         
-        @param ParseTree: The near-CNF parse ParseTree, or None.
-        @type ParseTree: ParseTree, or None.
+        @param tree: The near-CNF parse ParseTree, or None.
+        @type tree: ParseTree, or None.
         
         @return: If ParseTree is not None, returns the original ParseTree. Otherwise, returns None.
         @rtype: ParseTree or None.
@@ -396,6 +418,7 @@ class PCFG(PCFGBase):
             return
         tree = copy.deepcopy(tree)
         self.__revert_step_4(tree.root)
+        self.__revert_step_2(tree.root)
 
         # 1) Get rid of S_0 -> S
         new_root = tree.root.children[0]
