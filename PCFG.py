@@ -20,6 +20,10 @@ TERMINAL_VAR_PREFIX = 'TERMINAL_'
 SHORTENED_VAR_PREFIX = 'SHORTENED_'
 EPSILON = ''
 
+TERMINAL_BACK_POINTER = 'TERMINAL_BACK_POINTER'
+ORDINARY_BACK_POINTER = 'ORDINARY_BACK_POINTER'
+UNIT_RULE_BACK_POINTER = 'UNIT_RULE_BACK_POINTER'
+
 #================================================================================
 # Classes
 #================================================================================
@@ -428,6 +432,47 @@ class NearCNF(PCFGBase):
     Represents a PCFG in near-CNF.
     """
 
+    class UnitRulesGraph:
+        """
+
+        """
+        def __init__(self, near_cnf_grammar):
+            """
+
+            @param near_cnf_grammar:
+            @return:
+            """
+            unit_rules = tuple(rule for rule in near_cnf_grammar.rules
+                               if len(rule.derivation) == 1 and PCFG.is_variable(rule.derivation[0]))
+            self.vertices = frozenset(rule.variable for rule in unit_rules)
+            self.neighbors = {v: [] for v in self.vertices}
+            for rule in unit_rules:
+                self.neighbors[rule.variable].append(rule.derivation[0], rule.probability)
+
+    def dijkstra_max_prob(self, unit_rules_graph, source_var):
+        """
+
+        @param unit_rules_graph:
+        @param source_var:
+        @return:
+        """
+        variables = unit_rules_graph.vertices
+        dist = {var: None for var in variables}
+        dist[source_var] = 1.0
+        previous = {var: None for var in variables}
+        queue = set(variables)
+        while queue:
+            max_dist, max_dist_var = max((d, v) for v, d in dist.items() if d is not None)
+            queue.remove(max_dist_var)
+            for neighbor, prob in unit_rules_graph.neighbors[max_dist_var]:
+                if neighbor not in queue:
+                    continue
+                alt_dist = dist[max_dist_var] * prob
+                if dist[neighbor] is None or alt_dist > dist[neighbor]:
+                    dist[neighbor] = alt_dist
+                    previous[neighbor] = max_dist_var
+            return dist, previous
+
     def __bfs_rules(self):
         """
         Helper function for cky_parse. Maps each variable A to a list [(B1, P1), ..., (Br, Pr)], such that:
@@ -474,7 +519,7 @@ class NearCNF(PCFGBase):
 
         # backpointer may begin with a list of variables [A1, ..., Ar], corresponding to a chain of unit rules
         # item -> A1 -> ... -> Ar.
-        if isinstance(backpointer[0], list):
+        if backpointer.type == UNIT_RULE_BACK_POINTER:
             chain = backpointer[0]
             # Convert the chain of unit rules to corresponding child nodes.
             for var in chain:
@@ -566,7 +611,7 @@ class NearCNF(PCFGBase):
             for rule in self.rules:
                 if rule.derivation == [word_j]:
                     t[j - 1][j][rule.variable] = rule.probability
-                    back[j - 1][j][rule.variable] = ([], word_j)
+                    back[j - 1][j][rule.variable] = {"type": TERMINAL_BACK_POINTER, "rule": rule}
 
             # Improve using unit rules
             while True:
@@ -587,7 +632,7 @@ class NearCNF(PCFGBase):
                         alt_prob = rule.probability * t[i][k][B] * t[k][j][C]
                         if t[i][j][A] < alt_prob:
                             t[i][j][A] = alt_prob
-                            back[i][j][A] = (k, B, C)
+                            back[i][j][A] = {"type": ORDINARY_BACK_POINTER, "k": k, "rule": rule}
                 # Then, handle unit rules.
                 for A, routes in unit_routes.items():
                     # Note that from here on to the end of the loop, each variable is traversed at most once,
@@ -598,7 +643,7 @@ class NearCNF(PCFGBase):
                             alt_prob *= prob * t[i][j][var]
                             if t[i][j][A] < alt_prob:
                                 t[i][j][A] = alt_prob
-                                back[i][j][A] = (B,)
+                                back[i][j][A] = {"type": UNIT_RULE_BACK_POINTER, "rule": rule}
 
         return self.__reconstruct_tree(t, back, T)
 
