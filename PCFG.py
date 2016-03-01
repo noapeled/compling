@@ -582,7 +582,8 @@ class NearCNF(PCFGBase):
         root_with_original_start_variable = \
             NearCNF.__recursive_backtrack(back, 0, sentence_len, original_start_variable)
         # The tree has probability as computed in cky_parse.
-        tree_prob = probs[0, sentence_len, original_start_variable]
+        cnf_start_variable = start_rule.variable
+        tree_prob = probs[0, sentence_len, cnf_start_variable]
         root = ParseTreeNode(start_rule.variable, [root_with_original_start_variable], start_rule)
         return ParseTree(root, tree_prob)
 
