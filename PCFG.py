@@ -352,7 +352,8 @@ class PCFG(PCFGBase):
 
     # --------- FUNCTIONS FOR REVERTING BACK TO THE ORIGINAL GRAMMAR ---------
 
-    def __revert_terminal_variables(self, root):
+    @staticmethod
+    def __revert_terminal_variables(root):
         """
         Reverts terminal variables in the tree rooted at node.
         @param root: The root of the tree.
@@ -364,7 +365,8 @@ class PCFG(PCFGBase):
                 node.key = var_to_terminal(node.key)
                 node.children = []
 
-    def __revert_short_rules(self, root):
+    @staticmethod
+    def __revert_short_rules(root):
         """
         Reverts a succession of short rules created during conversion back to the long rule which yielded them.
         @param root: The root of tree in which to revert the rules.
@@ -380,30 +382,19 @@ class PCFG(PCFGBase):
                 new_children.extend(curr_node.children)
                 node.children = new_children
 
-    def __shorten_path(self, node):
-        replacement_children = []
-        while True:
-            for rule in self.rules:
-                if rule.variable == node.key:
-                    replacement_children.append(rule.children[0])
-                    node = rule.children[1]
-                    break
-            else:
-                break
-        replacement_children.extend(node.children)
-        return replacement_children
-
-    def __revert_step_4(self, root):
+    @staticmethod
+    def __revert_step_4(root):
         """
         Reverts step 4: terminal variables and short rules.
 
         @param root: root of the tree in which to revert.
         @type root: C{ParseTreeNode}
         """
-        self.__revert_terminal_variables(root)
-        self.__revert_short_rules(root)
+        PCFG.__revert_terminal_variables(root)
+        PCFG.__revert_short_rules(root)
 
-    def __revert_step_2(self, root):
+    @staticmethod
+    def __revert_step_2(root):
         """
         Reverts step 2: epsilon rules.
 
@@ -437,8 +428,8 @@ class PCFG(PCFGBase):
         if not tree:
             return
         tree = copy.deepcopy(tree)
-        self.__revert_step_4(tree.root)
-        self.__revert_step_2(tree.root)
+        PCFG.__revert_step_4(tree.root)
+        PCFG.__revert_step_2(tree.root)
         # Get rid of step 1, namely get rid of S_0 -> S
         new_root = tree.root.children[0]
         new_tree = ParseTree(new_root, tree.probability)
@@ -518,8 +509,8 @@ class NearCNF(PCFGBase):
         def get_prob(var, rhs):
             return 0.0 if (var not in searchable_rules) or (rhs not in searchable_rules[var]) \
                 else searchable_rules[var][rhs].probability
-        best_route = [searchable_rules[lhs_var][final_rhs]]
         best_route_prob = get_prob(lhs_var, final_rhs)
+        best_route = [] if best_route_prob == 0.0 else [searchable_rules[lhs_var][final_rhs]]
         for full_route in unit_routes.get(lhs_var, []):
             curr_prob = 1.0
             for i in range(1, len(full_route)):
@@ -529,7 +520,7 @@ class NearCNF(PCFGBase):
                 alt_prob = curr_prob * get_prob(next_var, final_rhs)
                 if alt_prob > best_route_prob:
                     best_route = [searchable_rules[full_route[j]][(full_route[j + 1],)]
-                                  for j in range(i + 1)]
+                                  for j in range(i)]
                     best_route.append(searchable_rules[full_route[i]][final_rhs])
                     best_route_prob = alt_prob
         return best_route, best_route_prob
@@ -628,11 +619,10 @@ class NearCNF(PCFGBase):
             # Derive individual letters from the sentence.
             word_j = sentence[j - 1]
             for rule in self.rules:
-                if rule.derivation == [word_j]:
-                    best_route, best_route_prob = NearCNF.__best_units_derivation(
-                            searchable_rules, unit_routes, rule.variable, (word_j,))
-                    t[j - 1, j, rule.variable] = best_route_prob
-                    back[j - 1, j, rule.variable] = {"type": TERMINAL_BACK_POINTER, "route": best_route}
+                best_route, best_route_prob = NearCNF.__best_units_derivation(
+                        searchable_rules, unit_routes, rule.variable, (word_j,))
+                t[j - 1, j, rule.variable] = best_route_prob
+                back[j - 1, j, rule.variable] = {"type": TERMINAL_BACK_POINTER, "route": best_route}
 
             # Derive non-terminal rules.
             for i in range(j - 2, -1, -1):
