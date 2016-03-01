@@ -42,7 +42,6 @@ def parse(text, grammar):
 #================================================================================
 
 if __name__ == "__main__":
-    
     # Following is a short example text with 5 sentences and a corresponding example grammar.
     # The text is parsed per the grammar, and the resulting trees are printed.
     # Note that first and third sentences are ambiguous garden path sentences,
@@ -53,7 +52,6 @@ if __name__ == "__main__":
         'the prime number few. ' + \
         'seven is a prime number. ' + \
         'few captains become a prime man.'
-    # example_text = 'few captains become a prime man.'
 
     example_grammar = PCFG(start_variable="S", rules=[
         PCFGRule('S', ['NP', 'VP'], 0.9),
