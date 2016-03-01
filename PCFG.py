@@ -494,19 +494,33 @@ class NearCNF(PCFGBase):
 
     def __compute_unit_routes(self):
         unit_rules_graph = NearCNF.__UnitRulesGraph(self)
-        unit_routes = {var: self.__dijkstra_max_prob_tree(unit_rules_graph, var)
-                       for var in unit_rules_graph.vertices}
-        return unit_routes
+        unit_routes_as_trees = {var: self.__dijkstra_max_prob_tree(unit_rules_graph, var)
+                                for var in unit_rules_graph.vertices}
+
+        def tree_to_lists(root, current_route=[], routes=None):
+            if routes is None:
+                routes = []
+            current_route.append(root.key)
+            if not root.children:
+                routes.append(current_route[:])
+            else:
+                for child in root.children:
+                    tree_to_lists(child, current_route, routes)
+            current_route.pop()
+            return routes
+
+        unit_routes_as_lists = {var: tree_to_lists(tree.root)
+                                for var, tree in unit_routes_as_trees.items()}
+        return unit_routes_as_lists
 
     @staticmethod
     def __best_units_derivation(searchable_rules, unit_routes, lhs_var, final_rhs):
-        best_route = None
-        get_prob = lambda var, rhs: \
-            searchable_rules[var].get(rhs, {"probability": 0.0}).probability
+        def get_prob(var, rhs):
+            return 0.0 if (var not in searchable_rules) or (rhs not in searchable_rules[var]) \
+                else searchable_rules[var][rhs].probability
         best_route = [searchable_rules[lhs_var][final_rhs]]
         best_route_prob = get_prob(lhs_var, final_rhs)
-        for route in unit_routes.get(lhs_var, []):
-            full_route = [lhs_var] + route
+        for full_route in unit_routes.get(lhs_var, []):
             curr_prob = 1.0
             for i in range(1, len(full_route)):
                 prev_var = full_route[i - 1]
@@ -608,7 +622,7 @@ class NearCNF(PCFGBase):
         # Build tables.
         for j in range(1, T + 1):
             # Derive individual letters from the sentence.
-            word_j = sentence[j]
+            word_j = sentence[j - 1]
             for rule in self.rules:
                 if rule.derivation == [word_j]:
                     best_route, best_route_prob = NearCNF.__best_units_derivation(
