@@ -23,13 +23,7 @@ class ParseTree:
         self.probability = probability
     
     def __repr__(self):
-        return "(%f): %r" % (self.probability, self.root)
-
-    def __iter__(self):
-        """
-        An iterator for a pre-order traversal of the tree nodes.
-        """
-        return iter(self.root)
+        return "(%s): %r" % (self.probability, self.root)
 
 class ParseTreeNode:
     """
@@ -59,12 +53,8 @@ class ParseTreeNode:
             return self.key
 
     def preorder(self):
-        yield self
-        for child in self.children:
-            child.preorder()
-
-    def __iter__(self):
-        """
-        An iterator for a pre-order traversal of the node and its children.
-        """
-        return self.preorder()
+        stack = [self]
+        while stack:
+            node = stack.pop()
+            yield node
+            stack.extend(node.children[::-1])

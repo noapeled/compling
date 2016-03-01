@@ -359,7 +359,7 @@ class PCFG(PCFGBase):
         @type root: C{ParseTreeNode}
         """
         var_to_terminal = lambda var_name: var_name[len(TERMINAL_VAR_PREFIX):].lower()
-        for node in root:
+        for node in root.preorder():
             if node.key.startswith(TERMINAL_VAR_PREFIX):
                 node.key = var_to_terminal(node.key)
                 node.children = []
@@ -370,7 +370,7 @@ class PCFG(PCFGBase):
         @param root: The root of tree in which to revert the rules.
         @type root: C{ParseTreeNode}
         """
-        for node in root:
+        for node in root.preorder():
             if any(child.key.startswith(SHORTENED_VAR_PREFIX) for child in node.children):
                 new_children = []
                 curr_node = node
@@ -410,7 +410,7 @@ class PCFG(PCFGBase):
         @param root: root of the tree in which to revert.
         @type root: C{ParseTreeNode}
         """
-        for node in root:
+        for node in root.preorder():
             try:
                 indexes_to_revert = node.rule.original_rule.indexes_to_remove
                 variable_to_revert = node.rule.original_rule.removed_variable

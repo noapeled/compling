@@ -47,11 +47,13 @@ if __name__ == "__main__":
     # The text is parsed per the grammar, and the resulting trees are printed.
     # Note that first and third sentences are ambiguous garden path sentences,
     # each having more than one possible derivation.
-    example_text = 'the old man the boat. ' + \
-                   'an old man is in the boat. ' + \
-                   'the prime number few. ' + \
-                   'seven is a prime number. ' + \
-                   'few captains become a prime man.'
+    # example_text = \
+    #     'the old man the boat. ' + \
+    #     'an old man is in the boat. ' + \
+    #     'the prime number few. ' + \
+    #     'seven is a prime number. ' + \
+    #     'few captains become a prime man.'
+    example_text = 'the prime number few. '
 
     example_grammar = PCFG(start_variable="S", rules=[
         PCFGRule('S', ['NP', 'VP'], 0.9),
