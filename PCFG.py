@@ -451,7 +451,8 @@ class NearCNF(PCFGBase):
 
     class __UnitRulesGraph:
         """
-
+        A graph where vertices correspond to all variables and edges correspond to unit rules
+        (A -> B, where both A and B are variables) of the grammar.
         """
         def __init__(self, near_cnf_grammar):
             """
@@ -459,9 +460,9 @@ class NearCNF(PCFGBase):
             @param near_cnf_grammar:
             @return:
             """
+            self.vertices = frozenset(rule.variable for rule in near_cnf_grammar.rules)
             unit_rules = tuple(rule for rule in near_cnf_grammar.rules
                                if len(rule.derivation) == 1 and PCFG.is_variable(rule.derivation[0]))
-            self.vertices = frozenset(rule.variable for rule in unit_rules)
             self.neighbors = {v: [] for v in self.vertices}
             for rule in unit_rules:
                 self.neighbors[rule.variable].append((rule.derivation[0], rule.probability))
@@ -502,8 +503,9 @@ class NearCNF(PCFGBase):
         best_route = None
         get_prob = lambda var, rhs: \
             searchable_rules[var].get(rhs, {"probability": 0.0}).probability
+        best_route = [searchable_rules[lhs_var][final_rhs]]
         best_route_prob = get_prob(lhs_var, final_rhs)
-        for route in unit_routes[lhs_var]:
+        for route in unit_routes.get(lhs_var, []):
             full_route = [lhs_var] + route
             curr_prob = 1.0
             for i in range(1, len(full_route)):
@@ -567,12 +569,12 @@ class NearCNF(PCFGBase):
         @rtype: C{ParseTree} or C{NoneType}
         """
         # If sentence isn't in the language of the grammar.
-        if not back[0][sentence_len][self.start_variable]:
+        if not back[0, sentence_len, self.start_variable]:
             return
         # Otherwise, reconstruct and return the computed maximum probability tree for the sentence.
         root = self.__recursive_backtrack(back, 0, sentence_len, self.start_variable)
         # The tree has probability as computed in cky_parse.
-        tree_prob = probs[0][sentence_len][self.start_variable]
+        tree_prob = probs[0, sentence_len, self.start_variable]
         return ParseTree(root, tree_prob)
 
     def cky_parse(self, sentence):
@@ -594,14 +596,14 @@ class NearCNF(PCFGBase):
         sentence = sentence.split()
         T = len(sentence)
 
+        unit_routes = self.__compute_unit_routes()
+        searchable_rules = PCFG.get_searchable_rules(self.rules)
+
         # The 3D tables of dimensions (T+1)x(T+1)x|V| are each implemented as a nested list,
         # such that each cell [i][j] holds a dict which maps variables to probabilities (table t)
         # or to backtrack pointers (table back).
-        t = [[{} for j in range(T + 1)] for i in range(T + 1)]
-        back = [[None for j in range(T + 1)] for i in range(T + 1)]
-
-        unit_routes = self.__compute_unit_routes()
-        searchable_rules = PCFG.get_searchable_rules(self.rules)
+        t = defaultdict(float)
+        back = defaultdict(dict)
 
         # Build tables.
         for j in range(1, T + 1):
@@ -611,8 +613,8 @@ class NearCNF(PCFGBase):
                 if rule.derivation == [word_j]:
                     best_route, best_route_prob = NearCNF.__best_units_derivation(
                             searchable_rules, unit_routes, rule.variable, (word_j,))
-                    t[j - 1][j][rule.variable] = best_route_prob
-                    back[j - 1][j][rule.variable] = {"type": TERMINAL_BACK_POINTER, "route": best_route}
+                    t[j - 1, j, rule.variable] = best_route_prob
+                    back[j - 1, j, rule.variable] = {"type": TERMINAL_BACK_POINTER, "route": best_route}
 
             # Derive non-terminal rules.
             for i in range(j - 2, -1, -1):
@@ -622,10 +624,10 @@ class NearCNF(PCFGBase):
                         B, C = rule.derivation
                         best_route, best_route_prob = NearCNF.__best_units_derivation(
                             searchable_rules, unit_routes, A, (B, C))
-                        alt_prob = best_route_prob * t[i][k][B] * t[k][j][C]
-                        if t[i][j][A] < alt_prob:
-                            t[i][j][A] = alt_prob
-                            back[i][j][A] = {"type": ORDINARY_BACK_POINTER, "k": k, "route": best_route}
+                        alt_prob = best_route_prob * t[i, k, B] * t[k, j, C]
+                        if t[i, j, A] < alt_prob:
+                            t[i, j, A] = alt_prob
+                            back[i, j, A] = {"type": ORDINARY_BACK_POINTER, "k": k, "route": best_route}
 
         return self.__reconstruct_tree(t, back, T)
 
