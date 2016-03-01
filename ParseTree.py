@@ -19,10 +19,20 @@ class ParseTree:
     @type probability: float 
     """
     def __init__(self, root, probability = 0):
+        """
+        Constructs a derivation tree.
+        @param root: The root node of the tree.
+        @type root: C{ParseTreeNode}
+        @param probability: The probability of the derivation tree.
+        @type probability: L{float}
+        """
         self.root = root
         self.probability = probability
     
     def __repr__(self):
+        """
+        Converts a tree to string representation.
+        """
         return "(%s): %r" % (self.probability, self.root)
 
 class ParseTreeNode:
@@ -40,6 +50,9 @@ class ParseTreeNode:
     @type children: A sequence (e.g. a list) of ParseTreeNode instances.
     """
     def __init__(self, key, children=None, rule=None):
+        """
+        Constructs a new node. See class documentation for parameters.
+        """
         self.key = key
         self.rule = rule
         if children == None:
@@ -47,12 +60,18 @@ class ParseTreeNode:
         self.children = children
 
     def __repr__(self):
+        """
+        Converts a node to string representation.
+        """
         if len(self.children) > 0:
             return "[%s %s]" % (self.key, " ".join(map(repr, self.children)))
         else:
             return self.key
 
     def preorder(self):
+        """
+        Generator function, yields the tree nodes in pre-order traversal order, starting from the tree root.
+        """
         stack = [self]
         while stack:
             node = stack.pop()
