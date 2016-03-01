@@ -220,7 +220,7 @@ class PCFG(PCFGBase):
             new_rules_2c.extend(PCFG.__remove_from_rhs(rule, A, epsilon_rule.probability, seen_epsilon_vars))
 
         # Finally, consolidate every set of rules {X -> u [q_1], ..., X -> u [q_n]}
-        # into one rule X -> u [q_1 + ... + q_n]
+        # into one rule X -> u [q_1 + ... + q_n], as per the algorithm we learnt in class.
         repeated_rules = defaultdict(float)
         for rule in new_rules_2c:
             repeated_rules[rule.variable, tuple(rule.derivation)] += rule.probability
