@@ -508,6 +508,12 @@ class NearCNF(PCFGBase):
         return ParseTree(tree_nodes[source_var])
 
     def __compute_unit_routes(self):
+        """
+        Computes maximum-probability routes between every variable to all other variables.
+
+        @return: The routes for each variable.
+        @rtype: L{dict}
+        """
         unit_rules_graph = NearCNF.__UnitRulesGraph(self)
         unit_routes_as_trees = {var: self.__dijkstra_max_prob_tree(unit_rules_graph, var)
                                 for var in unit_rules_graph.vertices}
@@ -530,6 +536,25 @@ class NearCNF(PCFGBase):
 
     @staticmethod
     def __best_units_derivation(searchable_rules, unit_routes, lhs_var, final_rhs):
+        """
+        Finds the maximum-probability route, if exists, from lhs_var to final_rhs,
+        such that all edges in the route are unit rules, except possibly the last edge.
+
+        @param searchable_rules: Rules in a form on which it is easier to perform searches.
+        @type searchable_rules: L{dict}
+
+        @param unit_routes: maximum-probability routes for each variable.
+        @type unit_routes: L{dict}
+
+        @param lhs_var: The variable at the beginning of the route.
+        @type lhs_var: L{string}
+
+        @param final_rhs: the right-hand side of the last derivation.
+        @type final_rhs: L{list} of L{string}
+
+        @return: the aforementioned route.
+        @rtype: L{list} of C{PCFGRule}
+        """
         def get_prob(var, rhs):
             return 0.0 if (var not in searchable_rules) or (rhs not in searchable_rules[var]) \
                 else searchable_rules[var][rhs].probability
@@ -552,12 +577,22 @@ class NearCNF(PCFGBase):
     @staticmethod
     def __recursive_backtrack(back, i, j, var_or_term):
         """
+        Reconstructs a tree over terminals T_i...T_j from backpointers.
 
-        @param back:
-        @param i:
-        @param j:
-        @param var_or_term:
-        @return:
+        @param back: The table of backpointers.
+        @type back: L{dict}
+
+        @param i: the left limit.
+        @type i: L{int}
+
+        @param j: the right limit.
+        @type j: L{int}
+
+        @param var_or_term: variable or terminal.
+        @type var_or_term: L{string}
+
+        @return: the tree formed by backpointers.
+        @rtype: C{ParseTree}
         """
         root = ParseTreeNode(var_or_term)
 
@@ -684,6 +719,9 @@ class PCFGRule:
     """
     
     def __init__(self, variable, derivation, probability, original_rule=None):
+        """
+        Constructs a PCFG rule. See class documentation for parameters.
+        """
         self.variable = variable
         self.derivation = derivation
         self.probability = probability
@@ -691,10 +729,16 @@ class PCFGRule:
         self.original_rule = original_rule
 
     def copy(self):
+        """
+        Returns a copy of this rule, with the copied rule kept in an attribute.
+        """
         new_rule = copy.deepcopy(self)
         if not new_rule.original_rule:
             new_rule.original_rule = {"rule": self}
         return new_rule
 
     def __repr__(self):
+        """
+        Returns a string representation of the PCFG rule.
+        """
         return 'PCFGRule(%s, %s, %s)' % (self.variable, self.derivation, self.probability)
