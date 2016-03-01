@@ -96,6 +96,15 @@ class PCFGBase:
 
     @staticmethod
     def get_searchable_rules(rules):
+        """
+        A utility function, returns the rules in a form which is easier to search inside.
+
+        @param rules: the rules.
+        @type rules: A sequence (e.g. list) of C{PCFGRule}.
+
+        @return: The rules in a more searchable form.
+        @rtype: L{dict}
+        """
         searchable_rules = {rule.variable: {} for rule in rules}
         for rule in rules:
             searchable_rules[rule.variable][tuple(rule.derivation)] = rule
@@ -109,6 +118,7 @@ class PCFG(PCFGBase):
     @type cnf: NearCNF
     """
     def __init__(self, *args, **kwargs):
+        """Constructs a PCFG. See class documentation for parameters."""
         super().__init__(*args, **kwargs)
         self.cnf = None
     
@@ -251,6 +261,9 @@ class PCFG(PCFGBase):
         For internal use: step 2 of the conversion algorithm, removes epsilon rules and changes other rules accordingly.
         We assume there is at most one rule of the form X -> epsilon for each variable X.
 
+        @param rules: the rules to convert.
+        @type rules: a sequence (e.g. L{list}) of C{PCFGRule}.
+
         @return: the new rules,  which result from step 2 of the conversion algorithm.
         @rtype: list of C{CFGRule}
         """
@@ -271,8 +284,10 @@ class PCFG(PCFGBase):
         Implements step 3 for a single rule, that is converts a rule X->u1,...,un [q] to a list
         [X-> u1X1[q] , X1 -> u2X2 [1], ..., X(n-2) -> u(n-1)un [1]].
         If the right hand side of the rule has at most two items, a list with the same rule is returned
+
         @param rule: the rule to convert
         @type rule: PCFGRule
+
         @return: the resulting rules
         @rtype: list of PCFGRule
         """
@@ -356,6 +371,7 @@ class PCFG(PCFGBase):
     def __revert_terminal_variables(root):
         """
         Reverts terminal variables in the tree rooted at node.
+
         @param root: The root of the tree.
         @type root: C{ParseTreeNode}
         """
@@ -369,6 +385,7 @@ class PCFG(PCFGBase):
     def __revert_short_rules(root):
         """
         Reverts a succession of short rules created during conversion back to the long rule which yielded them.
+
         @param root: The root of tree in which to revert the rules.
         @type root: C{ParseTreeNode}
         """
@@ -447,9 +464,10 @@ class NearCNF(PCFGBase):
         """
         def __init__(self, near_cnf_grammar):
             """
+            Constructs the graph described in the class documentation.
 
-            @param near_cnf_grammar:
-            @return:
+            @param near_cnf_grammar: A near-Grammar.
+            @type near_cnf_grammar: C{NearCNF}
             """
             self.vertices = frozenset(rule.variable for rule in near_cnf_grammar.rules)
             unit_rules = tuple(rule for rule in near_cnf_grammar.rules
@@ -461,10 +479,16 @@ class NearCNF(PCFGBase):
     @staticmethod
     def __dijkstra_max_prob_tree(unit_rules_graph, source_var):
         """
+        Obtains the tree of maximum-probability routes from a variable source_var to every variable
+        in the given graph.
+        @param unit_rules_graph: A graph of unit rules.
+        @type unit_rules_graph: C{__UnitRuleGraph}
 
-        @param unit_rules_graph:
-        @param source_var:
-        @return:
+        @param source_var: The variable at the resulting tree root.
+        @type source_var: L{string}
+
+        @return: the tree of maximum-probability routes.
+        @rtype: C{ParseTree}
         """
         variables = unit_rules_graph.vertices
         dist = {var: -1.0 for var in variables}
