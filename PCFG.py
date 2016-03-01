@@ -201,7 +201,7 @@ class PCFG(PCFGBase):
         @rtype: list of C{PCFGRule}
         """
         A = epsilon_rule.variable
-        factor = 1.0 / (1.0 - epsilon_rule.probability)
+        factor = 1.0 if epsilon_rule.probability >= 1.0 else 1.0 / (1.0 - (epsilon_rule.probability))
         new_rules_2b = []
         for rule in rules:
             # 2.a) Don't take the given epsilon rule into the result rules.
