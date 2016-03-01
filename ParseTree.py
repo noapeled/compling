@@ -58,10 +58,13 @@ class ParseTreeNode:
         else:
             return self.key
 
+    def preorder(self):
+        yield self
+        for child in self.children:
+            child.preorder()
+
     def __iter__(self):
         """
         An iterator for a pre-order traversal of the node and its children.
         """
-        yield self
-        for child in self.children:
-            yield iter(child)
+        return self.preorder()
