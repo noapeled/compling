@@ -637,7 +637,8 @@ class NearCNF(PCFGBase):
                             t[i, j, A] = alt_prob
                             back[i, j, A] = {"type": ORDINARY_BACK_POINTER, "k": k, "route": best_route}
 
-        start_rule = next(filter(lambda rule: rule.variable == self.start_variable, self.rules))
+        start_rule = next(filter(
+                lambda rule: rule.variable == self.start_variable and rule.derivation, self.rules))
         reconstructed_tree = self.__reconstruct_tree(start_rule, t, back, T)
         return reconstructed_tree
 
@@ -670,3 +671,6 @@ class PCFGRule:
         if not new_rule.original_rule:
             new_rule.original_rule = {"rule": self}
         return new_rule
+
+    def __repr__(self):
+        return 'PCFGRule(%s, %s, %s)' % (self.variable, self.derivation, self.probability)
