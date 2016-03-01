@@ -547,9 +547,9 @@ class NearCNF(PCFGBase):
         root = ParseTreeNode(var_or_term)
 
         if PCFG.is_variable(var_or_term):
-            backpointer = back[i][j][var_or_term]
+            backpointer = back[i, j, var_or_term]
             curr_node = root
-            route = backpointer["rule"]
+            route = backpointer["route"]
             for rule_index in range(len(route) - 1):
                 rule = route[rule_index]
                 curr_node.rule = rule
@@ -566,7 +566,8 @@ class NearCNF(PCFGBase):
 
         return root
 
-    def __reconstruct_tree(self, probs, back, sentence_len):
+    @staticmethod
+    def __reconstruct_tree(start_rule, probs, back, sentence_len):
         """
         Helper function for cky_parse, reconstructs the maximum probability tree from the given tables.
 
@@ -582,13 +583,16 @@ class NearCNF(PCFGBase):
         @return: The reconstructed tree, if the sentence which cky_parse worked on is in the language, None otherwise.
         @rtype: C{ParseTree} or C{NoneType}
         """
+        original_start_variable = start_rule.derivation[0]
         # If sentence isn't in the language of the grammar.
-        if not back[0, sentence_len, self.start_variable]:
+        if not back[0, sentence_len, original_start_variable]:
             return
         # Otherwise, reconstruct and return the computed maximum probability tree for the sentence.
-        root = self.__recursive_backtrack(back, 0, sentence_len, self.start_variable)
+        root_with_original_start_variable = \
+            NearCNF.__recursive_backtrack(back, 0, sentence_len, original_start_variable)
         # The tree has probability as computed in cky_parse.
-        tree_prob = probs[0, sentence_len, self.start_variable]
+        tree_prob = probs[0, sentence_len, original_start_variable]
+        root = ParseTreeNode(start_rule.variable, [root_with_original_start_variable], start_rule)
         return ParseTree(root, tree_prob)
 
     def cky_parse(self, sentence):
@@ -643,7 +647,9 @@ class NearCNF(PCFGBase):
                             t[i, j, A] = alt_prob
                             back[i, j, A] = {"type": ORDINARY_BACK_POINTER, "k": k, "route": best_route}
 
-        return self.__reconstruct_tree(t, back, T)
+        start_rule = next(filter(lambda rule: rule.variable == self.start_variable, self.rules))
+        reconstructed_tree = self.__reconstruct_tree(start_rule, t, back, T)
+        return reconstructed_tree
 
 class PCFGRule:
     """
